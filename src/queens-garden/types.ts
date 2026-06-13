@@ -6,6 +6,8 @@
 
 export const ROUND_COUNT = 4;
 
+export type PlayerCount = 2 | 3 | 4;
+
 export const Phase = { Playing: 'playing', GameOver: 'game-over' } as const;
 export type Phase = (typeof Phase)[keyof typeof Phase];
 

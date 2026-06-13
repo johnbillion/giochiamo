@@ -34,12 +34,12 @@ _(Pass 1 — a few sentences: theme, number of rounds, how you win.)_
   Placement & payment), and coins are **earned** by completing 6-tile regions on placement
   (**earning** — see *Earning coins*).
 - **Garden-section supply** — a pool of exactly **36** sections (one per colour+symbol combo);
-  each round draws **n = player count + 3** at random (so **5 / 6 / 7** for **2 / 3 / 4**).
+  each round draws **n** at random (**5 / 7 / 8** for **2 / 3 / 4** players).
 - _(Scoring wheel, tokens, central drafting area — TBD in later chunks.)_
 
 ## Setup
 - Player count **2–4**. Rules vary little by count — it mainly changes the **number of garden
-  sections** in play (**n = player count + 3**: 5 / 6 / 7 for 2 / 3 / 4).
+  sections** in play (**n = 5 / 7 / 8** for 2 / 3 / 4).
 - Each player starts with **no tiles and no sections**.
 - The play area starts **empty except the centre slot**, which holds **one empty garden
   section**. The 6 edge slots **cannot receive tiles until a garden section is placed there
@@ -49,7 +49,7 @@ _(Pass 1 — a few sentences: theme, number of rounds, how you win.)_
 ## Central area & tile flow
 - The **tile supply** (108 tiles, drawn at random) and **section supply** (36 sections) sit in
   a shared **central area** used by all players; a **discard pile** collects spent tiles.
-- **Per round, n sections are in play:** n = **5 / 6 / 7** for **2 / 3 / 4** players, drawn at
+- **Per round, n sections are in play:** n = **5 / 7 / 8** for **2 / 3 / 4** players, drawn at
   random from the remaining section pool at the start of each round and **stacked into a pile**.
 - **4 tiles** (random from the supply) are placed on the **top** section of the pile.
 - Players **draft tiles** from **any tiles currently in the central area** — the top section's

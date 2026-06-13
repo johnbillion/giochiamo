@@ -17,6 +17,7 @@ import {
   type Action,
   type CentralArea,
   type Display,
+  type PlayerCount,
   type PlayerState,
   type ReorderAction,
   type Section,
@@ -35,9 +36,6 @@ import {
   resolvePlaceSection,
   resolvePlaceTile,
 } from './placement';
-
-const PLAYER_COUNT_MIN = 2;
-const PLAYER_COUNT_MAX = 4;
 
 // The 108-tile supply: every colour×symbol combo, TILE_COPIES times.
 function buildTileBag(): Tile[] {
@@ -63,9 +61,13 @@ function buildSectionPool(): Section[] {
   return sections;
 }
 
-// Sections in play per round: 2→5, 3→6, 4→7.
-function sectionsPerRound(playerCount: number): number {
-  return playerCount + 3;
+// Sections in play per round.
+export function sectionsPerRound(playerCount: PlayerCount): number {
+  return {
+    2: 5,
+    3: 7,
+    4: 8,
+  }[playerCount];
 }
 
 // Deal a round's central area from the supply: n sections into a pile, 4 tiles onto the top.
@@ -73,7 +75,7 @@ function sectionsPerRound(playerCount: number): number {
 function dealRound(
   supply: Supply,
   rng: Rng,
-  playerCount: number,
+  playerCount: PlayerCount,
 ): { central: CentralArea; supply: Supply } {
   const n = sectionsPerRound(playerCount);
   const roundSections = supply.sections.slice(0, n);
@@ -87,13 +89,10 @@ function dealRound(
 }
 
 export function createInitialState(
-  playerCount: number,
+  playerCount: PlayerCount,
   seed: number,
   firstPlayer = 0,
 ): State {
-  if (playerCount < PLAYER_COUNT_MIN || playerCount > PLAYER_COUNT_MAX) {
-    throw new Error(`Player count must be ${PLAYER_COUNT_MIN}–${PLAYER_COUNT_MAX}.`);
-  }
 
   const rng = makeRng(seed);
   const fullSupply: Supply = {
@@ -216,7 +215,8 @@ function endRound(state: State): State {
     ...state.supply,
     discard: [...state.supply.discard, ...centralTiles(state.central)],
   };
-  const { central, supply } = dealRound(replenished, rng, state.players.length);
+  // players.length is a valid PlayerCount by construction (createInitialState validated it).
+  const { central, supply } = dealRound(replenished, rng, state.players.length as PlayerCount);
 
   // Start the next round: the first-passer leads, passes reset, marker cleared.
   return {

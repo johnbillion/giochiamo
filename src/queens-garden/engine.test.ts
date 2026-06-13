@@ -30,9 +30,11 @@ describe('setup', () => {
     expect(s.players.every((p) => !p.passed && p.score === 0)).toBe(true);
   });
 
-  it('rejects an out-of-range player count', () => {
-    expect(() => createInitialState(1, 1)).toThrow();
-    expect(() => createInitialState(5, 1)).toThrow();
+  it('constrains player count to 2–4 at the type level', () => {
+    // @ts-expect-error player count is the union 2 | 3 | 4
+    () => createInitialState(1, 1);
+    // @ts-expect-error player count is the union 2 | 3 | 4
+    () => createInitialState(5, 1);
   });
 });
 

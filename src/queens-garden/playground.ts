@@ -24,6 +24,7 @@ import {
   type Direction,
   type Garden,
   type Payment,
+  type PlayerCount,
   type Section,
   type SlotId,
   type State,
@@ -116,7 +117,7 @@ export function render(state: State): string {
   return lines.join('\n');
 }
 
-export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
+export function newGame(playerCount: PlayerCount = 2, seed = 1, firstPlayer = 0) {
   let state = createInitialState(playerCount, seed, firstPlayer);
   console.log(legendText()); // print the tile → character key once at the start
 

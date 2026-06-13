@@ -5,7 +5,7 @@
 > scaled up. Resolvers stay stubbed until Pass 3.
 
 **Target player count (first build):** general **2–4** — the engine isn't specialised to one
-count; player count only feeds `sectionsPerRound = playerCount + 3`.
+count; player count only feeds `sectionsPerRound` (5 / 7 / 8 for 2 / 3 / 4).
 
 ---
 
@@ -38,7 +38,7 @@ fields that can't be derived (the chess-castling lesson).
 | Region | Fields | Notes |
 |---|---|---|
 | Supply / pools | **Tile bag** (remaining of 108) + **discard pile** + **section pool** (remaining of 36) + **seed** | bag-empty → shuffle discard back in (seed-driven, must be logged); batch draws & section picks seed-driven |
-| Central area (per round) | **Pile** of this round's n sections (n=5/6/7); the **top** section holds 4 tiles; **split-off sections** each hold their leftover tiles (still draftable). Draft source = **all tiles in the central area**. A section is **takeable once emptied** (derived: tiles == 0). | top splits when <4 → next revealed w/ 4 fresh; leftovers discarded at round end |
+| Central area (per round) | **Pile** of this round's n sections (n=5/7/8); the **top** section holds 4 tiles; **split-off sections** each hold their leftover tiles (still draftable). Draft source = **all tiles in the central area**. A section is **takeable once emptied** (derived: tiles == 0). | top splits when <4 → next revealed w/ 4 fresh; leftovers discarded at round end |
 | Scoring wheel | _(current position)_ | changes per round |
 | Per player | **Play area** = 7 section slots (1 centre + 6 edge); centre starts with the **blank starter section** (6 free spaces, no identity), edges start empty. Each placed **non-centre section** carries a (colour, symbol) **identity tile** in 1 slot, leaving **5 free**. **Storage**: an **ordered tile area** (`StorageItem[]` of tiles + coins, ≤ **12**; starts with 3 coins; rearrangeable) + **2 sections**. **Score**. **Passed-this-round** flag. | section identity is game-relevant (scoring); ≤ 6 + 6×5 = **36** placeable spaces; passed-flag stored |
 | Bookkeeping | round # (1–4), whose turn, **first-passer this round** (∅ until someone passes), phase | first-passer is history-dependent → stored; sets the −1 penalty and next round's first player |

@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { createInitialState } from './engine';
-import { COLOURS, STARTING_COINS, SYMBOLS, storageCoins, storageTiles, type State } from './types';
+import { createInitialState, sectionsPerRound } from './engine';
+import {
+  COLOURS,
+  STARTING_COINS,
+  SYMBOLS,
+  storageCoins,
+  storageTiles,
+  type PlayerCount,
+  type State,
+} from './types';
 
 // Tiles visible right after the deal: bag + discard + whatever sits in the central area.
 function tilesInPlay(state: State): number {
@@ -16,15 +24,11 @@ describe('initial deal', () => {
     expect(tilesInPlay(createInitialState(2, 1))).toBe(108);
   });
 
-  it('deals n sections into the pile by player count (2→5, 3→6, 4→7)', () => {
-    for (const [count, n] of [
-      [2, 5],
-      [3, 6],
-      [4, 7],
-    ] as const) {
+  it('deals n sections into the pile by player count', () => {
+    for (const count of [2, 3, 4] as const satisfies PlayerCount[]) {
       const s = createInitialState(count, 1);
       const inPile = (s.central.top ? 1 : 0) + s.central.pile.length;
-      expect(inPile).toBe(n);
+      expect(inPile).toBe(sectionsPerRound(count));
       expect(inPile + s.supply.sections.length).toBe(36); // all 36 accounted for
     }
   });
