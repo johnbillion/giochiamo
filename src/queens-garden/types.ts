@@ -67,11 +67,25 @@ export function storageCoins(storage: PlayerStorage): number {
 
 export type PlayerId = number; // 0-based index into State.players
 
+// --- the garden (play area) — its fixed topology lives in garden.ts ---
+// 7 hex slots: 0 = centre, 1–6 = the ring. Directions 0–5 are the six hex directions;
+// opposite(d) = (d + 3) % 6.
+export type SlotId = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type Direction = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type PlacedSection = {
+  readonly identity: Tile | null; // immovable identity tile; null = the blank starter section
+  readonly rotation: Direction; // the identity faces this board direction (unused when identity is null)
+  readonly tiles: readonly (Tile | null)[]; // length 6, indexed by BOARD direction; placed tiles
+};
+
+export type Garden = readonly (PlacedSection | null)[]; // length 7, indexed by SlotId
+
 export type PlayerState = {
   readonly passed: boolean; // has this player passed this round?
   readonly score: number;
   readonly storage: PlayerStorage;
-  // the play area (placed sections + tiles) lands when the `place` rules are modelled
+  // `garden: Garden` is wired in with the placement slice (nothing fills it until then)
 };
 
 export type State = {

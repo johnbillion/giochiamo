@@ -94,8 +94,11 @@ gets an entry — these are the future-bugs we're heading off.
    start empty and need a section before tiles. *Remaining:* per-count section numbers.
 2. ~~Does a garden section's centre symbol constrain placement/scoring?~~ **RESOLVED:** the
    centre symbol is **purely decorative** — no gameplay effect; not modelled.
-3. Are the **6 tile spaces** of a section positionally distinct (fixed orientation, each edge
-   meaningful) or interchangeable? — *hex adjacency / placement.*
+3. ~~Section orientation — fixed or rotatable?~~ **RESOLVED:** a section is placed with a chosen
+   **rotation** (6 positions). Its 6 tile-slots map to the 6 **board directions**; the immovable
+   **identity** tile sits at a fixed intrinsic slot, so rotation sets which board-direction it
+   faces — which affects placement legality. Codified: `PlacedSection { identity, rotation, tiles
+   by board-direction }` in `types.ts`; topology in `garden.ts`.
 4. ~~Does storage hold tiles + sections; is it bounded?~~ **RESOLVED:** holds both; capped at
    **12 tiles and 2 sections** (a precondition on the `take` actions).
 5. **Adjacency across sections:** do edge tiles of neighbouring sections count as adjacent for
@@ -169,11 +172,12 @@ gets an entry — these are the future-bugs we're heading off.
     6`; across a shared edge, slot S's `dir d` tile is adjacent to neighbour T's `dir (d+3) mod 6`
     tile. Encode the fixed topology **once** (a neighbour table, like TTT's `WIN_MASKS`) and unit-
     test the derived 42-position adjacency graph — don't recompute geometry at runtime.
-    **Pivotal open question:** can a placed section be **rotated**, or is orientation **fixed**?
-    Fixed → tile-slots are absolute-direction-indexed (no per-section state; identity at a fixed
-    direction). Rotatable → store a `rotation` per placed section and derive board-direction ↔
-    intrinsic-slot from it. Also confirm: tile-slots sit on the 6 **edges** (one per direction),
-    and whether the identity tile's slot is fixed or travels with rotation.
+    **RESOLVED — rotatable:** a placed section stores a **`rotation` (0–5)**; tile positions are
+    indexed by **board direction**, and the identity faces board-direction = rotation. Codified in
+    `garden.ts` — `neighbourSlot` (the table, derived from axial coords), `adjacentPositions`
+    (within-ring `dir ± 1` + cross-edge `dir + 3`), `tileAt`, `createStarterGarden` — with the
+    `PlacedSection` / `Garden` / `SlotId` / `Direction` types in `types.ts`, all unit-tested.
+    *The `garden` field is wired into `PlayerState` with the placement slice.*
 
 ## Design notes
 

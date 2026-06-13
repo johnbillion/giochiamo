@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+
+import { adjacentPositions, createStarterGarden, neighbourSlot, tileAt, type TilePosition } from './garden';
+import type { Direction, PlacedSection, SlotId, Tile } from './types';
+
+const DIRECTIONS: Direction[] = [0, 1, 2, 3, 4, 5];
+const SLOTS: SlotId[] = [0, 1, 2, 3, 4, 5, 6];
+const RING: SlotId[] = [1, 2, 3, 4, 5, 6];
+
+const key = (p: TilePosition): string => `${p.slot}:${p.dir}`;
+
+describe('garden topology — section adjacency', () => {
+  it('the centre is adjacent to all six ring slots', () => {
+    const neighbours = DIRECTIONS.map((d) => neighbourSlot(0, d));
+    expect(new Set(neighbours)).toEqual(new Set(RING));
+  });
+
+  it('each ring slot is adjacent to the centre + 2 ring-neighbours (degree 3)', () => {
+    for (const slot of RING) {
+      const neighbours = DIRECTIONS.map((d) => neighbourSlot(slot, d)).filter(
+        (n): n is SlotId => n !== null,
+      );
+      expect(neighbours).toHaveLength(3);
+      expect(neighbours).toContain(0); // the centre
+    }
+  });
+
+  it('the neighbour table is symmetric', () => {
+    for (const slot of SLOTS) {
+      for (const dir of DIRECTIONS) {
+        const t = neighbourSlot(slot, dir);
+        if (t !== null) {
+          expect(neighbourSlot(t, ((dir + 3) % 6) as Direction)).toBe(slot);
+        }
+      }
+    }
+  });
+});
+
+describe('garden topology — tile adjacency', () => {
+  it('includes the two ring-neighbours within a section', () => {
+    const adj = adjacentPositions({ slot: 0, dir: 2 });
+    expect(adj).toContainEqual({ slot: 0, dir: 1 });
+    expect(adj).toContainEqual({ slot: 0, dir: 3 });
+  });
+
+  it('crosses the shared edge to the opposite direction of the neighbour', () => {
+    // The centre's tile at direction 0 touches ring slot 1's tile at direction 3.
+    expect(adjacentPositions({ slot: 0, dir: 0 })).toContainEqual({ slot: 1, dir: 3 });
+  });
+
+  it('is symmetric across all 42 positions', () => {
+    for (const slot of SLOTS) {
+      for (const dir of DIRECTIONS) {
+        const a: TilePosition = { slot, dir };
+        for (const b of adjacentPositions(a)) {
+          expect(adjacentPositions(b).map(key)).toContain(key(a));
+        }
+      }
+    }
+  });
+});
+
+describe('section rotation & the starter', () => {
+  it('rotation sets which board direction the identity faces', () => {
+    const id: Tile = { colour: 'red', symbol: 'bird' };
+    const section: PlacedSection = { identity: id, rotation: 2, tiles: Array.from({ length: 6 }, () => null) };
+    expect(tileAt(section, 2)).toEqual(id); // identity faces its rotation
+    expect(tileAt(section, 0)).toBeNull(); // other directions empty
+  });
+
+  it('the starter garden has a blank centre and an empty ring', () => {
+    const g = createStarterGarden();
+    expect(g[0]).toEqual({ identity: null, rotation: 0, tiles: [null, null, null, null, null, null] });
+    expect(g.slice(1).every((slot) => slot === null)).toBe(true);
+  });
+});
