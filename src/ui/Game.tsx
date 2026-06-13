@@ -353,7 +353,7 @@ export function Game() {
               return (
                 <button
                   key={colour}
-                  className="draft-chip"
+                  className="draft-chip draft-chip-colour"
                   disabled={!enabled}
                   onClick={() => draft({ kind: 'colour', colour })}
                   style={{ background: enabled ? COLOUR_HEX[colour] : undefined }}

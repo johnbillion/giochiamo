@@ -133,6 +133,9 @@ button:disabled {
   padding: 3px 12px;
   background: #fff;
   text-transform: capitalize;
+  color: #1e293b;
+}
+.draft-chip.draft-chip-colour:not(:disabled) {
   color: #fff;
 }
 .draft-chip:disabled {
