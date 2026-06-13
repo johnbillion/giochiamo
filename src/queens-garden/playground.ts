@@ -12,14 +12,17 @@ import { applyAction, availableActionTypes, createInitialState, status } from '.
 import { buildDraft, draftableAttributes } from './draft';
 import {
   ActionType,
+  COLOURS,
   Phase,
   ROUND_COUNT,
   storageCoins,
   storageTiles,
+  SYMBOLS,
   type Action,
   type Attribute,
   type Colour,
   type Direction,
+  type Garden,
   type Payment,
   type Section,
   type SlotId,
@@ -31,6 +34,52 @@ import {
 const tileStr = (t: Tile): string => `${t.colour}/${t.symbol}`;
 const sectionStr = (s: Section): string => (s.identity ? tileStr(s.identity) : 'blank');
 const attrStr = (a: Attribute): string => (a.kind === 'colour' ? a.colour : a.symbol);
+
+// --- garden ASCII rendering ---
+// Each of the 36 tiles (6 colours × 6 symbols) gets one character, 0-9 then A-Z. The index is
+// colour-major: blue/acorn = 0 … yellow/pinecone = 35.
+const TILE_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const tileChar = (t: Tile): string =>
+  TILE_CHARS[COLOURS.indexOf(t.colour) * SYMBOLS.length + SYMBOLS.indexOf(t.symbol)] ?? '?';
+
+// The (line, c) grid position of every tile slot, indexed [slot][dir], derived from the board
+// geometry so the picture mirrors true adjacency. `line` is 1-based (1–12); the character column
+// is `2*c - 1`. The gaps left in the grid are the 7 decorative section-centre holes.
+const SLOT_LAYOUT: readonly (readonly (readonly [number, number])[])[] = [
+  [[8, 5], [7, 4], [6, 4], [5, 5], [6, 6], [7, 6]], // slot 0 (centre)
+  [[12, 5], [11, 4], [10, 4], [9, 5], [10, 6], [11, 6]], // slot 1
+  [[10, 2], [9, 1], [8, 1], [7, 2], [8, 3], [9, 3]], // slot 2
+  [[6, 2], [5, 1], [4, 1], [3, 2], [4, 3], [5, 3]], // slot 3
+  [[4, 5], [3, 4], [2, 4], [1, 5], [2, 6], [3, 6]], // slot 4
+  [[6, 8], [5, 7], [4, 7], [3, 8], [4, 9], [5, 9]], // slot 5
+  [[10, 8], [9, 7], [8, 7], [7, 8], [8, 9], [9, 9]], // slot 6
+];
+
+// One player's garden as 12 lines: a tile shows its character, an empty space of a placed section
+// shows '.', and a slot with no section yet shows 'o' (so the empty board is the bare skeleton).
+function renderGarden(garden: Garden): string {
+  const rows: string[][] = Array.from({ length: 12 }, () => Array<string>(17).fill(' '));
+  SLOT_LAYOUT.forEach((dirs, slot) => {
+    const section = garden[slot];
+    dirs.forEach(([line, c], dir) => {
+      const tile = section ? section.tiles[dir] ?? null : null;
+      rows[line - 1]![2 * c - 2] = section ? (tile ? tileChar(tile) : '.') : 'o';
+    });
+  });
+  return rows.map((r) => r.join('').replace(/ +$/, '')).join('\n');
+}
+
+// The tile → character key, as a 6×6 grid (rows = colour, cols = symbol).
+function legendText(): string {
+  const head = ' '.repeat(8) + SYMBOLS.map((s) => s.slice(0, 3).padStart(3)).join(' ');
+  const rows = COLOURS.map(
+    (colour, ci) =>
+      colour.padEnd(7) +
+      ' ' +
+      SYMBOLS.map((_, si) => (TILE_CHARS[ci * SYMBOLS.length + si] ?? '?').padStart(3)).join(' '),
+  );
+  return ['tile key (row = colour, col = symbol):', head, ...rows].join('\n');
+}
 
 // Console ergonomics: accept a partial payment (e.g. `{ coins: 2 }`) and fill in the rest, so the
 // untyped browser boundary doesn't crash the typed engine on a missing `tiles`/`sections`.
@@ -50,6 +99,7 @@ export function render(state: State): string {
     lines.push(`${turn} P${i}  score ${p.score}  ${storageCoins(p.storage)}c${passed}`);
     lines.push(`    tiles (${tiles.length}): ${tiles.map(tileStr).join(', ') || '—'}`);
     lines.push(`    sections (${sections.length}): ${sections.map(sectionStr).join(', ') || '—'}`);
+    lines.push(renderGarden(p.garden));
   });
 
   lines.push('central:');
@@ -68,6 +118,7 @@ export function render(state: State): string {
 
 export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
   let state = createInitialState(playerCount, seed, firstPlayer);
+  console.log(legendText()); // print the tile → character key once at the start
 
   const show = (): State => {
     console.log(render(state));
@@ -93,6 +144,7 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
         '  g.draftable()      attributes you could draft right now',
         '  g.actions()        action kinds available right now',
         '  g.show()           reprint the current board',
+        '  g.legend()         the tile → character key for the garden render',
         '  g.state            the raw, serializable game state',
         '  g.help()           this message',
       ].join('\n'),
@@ -123,6 +175,7 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
     actions: (): ActionType[] => availableActionTypes(state),
     draftable: (): Attribute[] => draftableAttributes(state),
     show,
+    legend: (): void => console.log(legendText()),
     help,
     get state(): State {
       return state;
