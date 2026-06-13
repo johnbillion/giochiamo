@@ -73,10 +73,11 @@ export type PlayerId = number; // 0-based index into State.players
 export type SlotId = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type Direction = 0 | 1 | 2 | 3 | 4 | 5;
 
+// A placed section is just a frame of 6 slots (indexed by board direction). The immovable
+// identity tile is no different from a player-placed tile once it's down — it's simply the tile
+// that sat on a slot when the section was placed. So all placement & scoring works tile-level.
 export type PlacedSection = {
-  readonly identity: Tile | null; // immovable identity tile; null = the blank starter section
-  readonly rotation: Direction; // the identity faces this board direction (unused when identity is null)
-  readonly tiles: readonly (Tile | null)[]; // length 6, indexed by BOARD direction; placed tiles
+  readonly tiles: readonly (Tile | null)[]; // length 6, indexed by board direction
 };
 
 export type Garden = readonly (PlacedSection | null)[]; // length 7, indexed by SlotId

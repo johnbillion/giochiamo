@@ -49,18 +49,13 @@ export function adjacentPositions(pos: TilePosition): TilePosition[] {
   return out;
 }
 
-// The tile shown at a section's board direction — the identity at its rotation, else a placed tile.
+// The tile on a section's slot, if any. (The identity is just one of these tiles.)
 export function tileAt(section: PlacedSection, dir: Direction): Tile | null {
-  if (section.identity !== null && dir === section.rotation) return section.identity;
   return section.tiles[dir] ?? null;
 }
 
-// A fresh garden: the blank starter section in the centre, every ring slot empty.
+// A fresh garden: the blank starter section (a frame of 6 empty slots) in the centre, ring empty.
 export function createStarterGarden(): Garden {
-  const starter: PlacedSection = {
-    identity: null,
-    rotation: 0,
-    tiles: Array.from({ length: 6 }, () => null),
-  };
+  const starter: PlacedSection = { tiles: Array.from({ length: 6 }, () => null) };
   return [starter, null, null, null, null, null, null];
 }

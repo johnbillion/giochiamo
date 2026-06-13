@@ -69,8 +69,8 @@ pure state transform. Filled in Pass 2.
 | Action | Parameters | Legal when (precondition) | Effect |
 |---|---|---|---|
 | Take (draft) | chosen **colour**/**symbol** + which copy of each duplicated combo | ≥1 draftable item bears it; one instance per **distinct** matching combo, chosen & present; distinct tiles ≤ free tile storage (12) **and** sections ≤ free section storage (2) | one chosen tile per distinct matching combo **and** all matching draftable sections → storage; then resolve splits/reveals |
-| Place section | stored section + target slot + **payment** | section in storage; target slot empty & playable (adjacency TBD); **payment valid** (see below) | section → slot; payment items discarded |
-| Place tile | stored tile + target space + **payment** | tile in storage; target space free & in a placed section (which TBD); **payment valid** | tile → space; payment items discarded |
+| Place section | stored section + target slot + **which slot its identity occupies** + **payment** | section in storage; target slot **empty**; the identity tile (on its chosen slot) shares **exactly one** of its colour/symbol with any other-section tile it faces (not both, not neither; empty/no-neighbour fine); **payment valid** | a blank frame is placed with the identity tile on the chosen slot; payment discarded |
+| Place tile | stored tile + target (slot, dir) + **payment** | tile in storage; target is an **empty space of a placed section**; placed tile shares **exactly one** attribute with **every** face-adjacent occupied tile (within-section ring + cross-edge); **payment valid** | tile fills the space; payment discarded |
 
 **Payment** (both place actions): cost = the placed item's **symbol index (1–6)**, *inclusive of
 the item itself*. Pay the remaining `cost − 1` with **matching items** (sharing the placed item's
@@ -94,20 +94,21 @@ gets an entry — these are the future-bugs we're heading off.
    start empty and need a section before tiles. *Remaining:* per-count section numbers.
 2. ~~Does a garden section's centre symbol constrain placement/scoring?~~ **RESOLVED:** the
    centre symbol is **purely decorative** — no gameplay effect; not modelled.
-3. ~~Section orientation — fixed or rotatable?~~ **RESOLVED:** a section is placed with a chosen
-   **rotation** (6 positions). Its 6 tile-slots map to the 6 **board directions**; the immovable
-   **identity** tile sits at a fixed intrinsic slot, so rotation sets which board-direction it
-   faces — which affects placement legality. Codified: `PlacedSection { identity, rotation, tiles
-   by board-direction }` in `types.ts`; topology in `garden.ts`.
+3. ~~Section orientation — fixed or rotatable?~~ **RESOLVED:** rotatable — you choose **which
+   slot the identity tile occupies** (6 choices). But we don't store rotation/identity: a placed
+   section is just a **frame of 6 tile-slots** and the identity is a pre-placed tile on one of
+   them (see #28). Placement legality is the tile-level adjacency rule applied to that tile.
 4. ~~Does storage hold tiles + sections; is it bounded?~~ **RESOLVED:** holds both; capped at
    **12 tiles and 2 sections** (a precondition on the `take` actions).
-5. **Adjacency across sections:** do edge tiles of neighbouring sections count as adjacent for
-   scoring? — *the hex shape "affects alignment".*
+5. ~~Adjacency across sections — edge-only or corners too?~~ **RESOLVED:** **face/edge adjacency
+   only** — corners don't count. The `dir ↔ dir+3` model in `garden.ts` is exactly right (one
+   other-section neighbour per tile). *(A later "runs" rule handles sequences of tiles — separate.)*
 6. ~~Round end & passing?~~ **RESOLVED:** round ends when all have passed; the first to pass
    loses **1 point** (at this round's scoring) and is **first player next round**.
 7. ~~One action per turn?~~ **RESOLVED:** exactly one action (or pass) per turn.
-8. **Placing a section:** any empty edge slot, or only adjacent to an already-placed section
-   (growing outward from the centre)?
+8. ~~Placing a section — any slot, or only adjacent to an existing one?~~ **RESOLVED:** **any
+   empty slot**, any rotation; no requirement to connect to an existing section (the identity may
+   face empty garden space). Legality is the identity-adjacency rule (#25).
 9. ~~Section supply / are sections identical?~~ **RESOLVED:** exactly **36** sections, one per
    colour+symbol combo; each carries its combo as an **immovable identity tile** in 1 of its 6
    slots (5 free). The **central starter** is blank (6 free, no identity). Per-round selection
@@ -172,12 +173,50 @@ gets an entry — these are the future-bugs we're heading off.
     6`; across a shared edge, slot S's `dir d` tile is adjacent to neighbour T's `dir (d+3) mod 6`
     tile. Encode the fixed topology **once** (a neighbour table, like TTT's `WIN_MASKS`) and unit-
     test the derived 42-position adjacency graph — don't recompute geometry at runtime.
-    **RESOLVED — rotatable:** a placed section stores a **`rotation` (0–5)**; tile positions are
-    indexed by **board direction**, and the identity faces board-direction = rotation. Codified in
+    **RESOLVED:** tile positions are indexed by **board direction**; a placed section is a
+    **frame of 6 tile-slots** (the identity is just a pre-placed tile — see #28). Codified in
     `garden.ts` — `neighbourSlot` (the table, derived from axial coords), `adjacentPositions`
     (within-ring `dir ± 1` + cross-edge `dir + 3`), `tileAt`, `createStarterGarden` — with the
     `PlacedSection` / `Garden` / `SlotId` / `Direction` types in `types.ts`, all unit-tested.
     *The `garden` field is wired into `PlayerState` with the placement slice.*
+
+25. **Per-player gardens + section-placement adjacency — RESOLVED:** gardens are **per-player**.
+    A section goes in **any empty slot** at a chosen **rotation**; legal iff the **identity**
+    faces only empty space, or an other-section tile (fixed/placed) sharing **exactly one**
+    attribute (colour **xor** symbol) — facing **neither** (no match) *or* **both** (exact
+    duplicate, e.g. red-flower beside red-flower) is illegal. **Face/edge adjacency only** (#5), so
+    the identity has exactly **one** other-section neighbour: `(neighbourSlot(slot, rot), rot+3)`.
+    *(Tile-placement constraint, the "runs" rule, + further rules still to come.)*
+
+26. **Tile placement = the generalized adjacency rule — RESOLVED:** a tile goes on an **empty
+    space of a placed section** (never a section-less area); legal iff it shares **exactly one**
+    attribute (colour xor symbol) with **every** face-adjacent occupied tile — its section's ring
+    neighbours (incl. the identity) and the cross-edge tile. This is the same predicate as #25;
+    section placement is just the case where only the cross-edge neighbour can be occupied. One
+    helper covers both: `adjacentPositions` + `tileAt` + a `shareExactlyOne` check.
+
+27. **Runs (placement constraint) — rule captured, topology open.** A *run* = a line of tiles
+    (incl. a section's identity). Placing must not create a run with >6 of one colour, >6 of one
+    symbol, or any identical tiles. *Likely simplification:* with only 6 symbols, **no-identical**
+    (rule 3) already caps a colour at 6 and a symbol at 6, so the binding check is just
+    "no identical tiles in any run through the placed position" — **confirm**. *Open — the line
+    topology:* need the precise set of lines. Known types: each section's **6-slot ring** (loop);
+    **cross-boundary** straight lines; the **6-slot loop** where two adjacent ring sections + the
+    centre meet. Proposed representation: a constant `LINES: TilePosition[][]` (with a circular
+    flag), defined once and unit-tested — the runs-equivalent of the neighbour table. A *run* is
+    then the maximal contiguous stretch of occupied tiles along a line through the placed tile.
+    *(Confirm: are there straight lines beyond the two loop types, and how are they traced?)*
+
+28. **Board = hex cells; identity is just a tile (simplification) — RESOLVED.** The screenshot
+    confirms tiles are hex **cells** (6 ringing each of the 7 holes) and a tile touches **one**
+    cross-section neighbour — validating the degree-3 adjacency already in `garden.ts` (no rebuild).
+    **Simplification:** `PlacedSection` is now just `{ tiles: (Tile|null)[6] }` — no stored
+    `identity`/`rotation`. The identity is a pre-placed tile; "rotation" is only the placement
+    choice of which slot it lands on. So placement & scoring are **uniformly tile-level**, and
+    `place section` = drop a blank frame + place the identity tile (same adjacency check as
+    `place tile`). *Still open — run line-tracing:* the degree-3 adjacency gives the section rings
+    + pairwise cross-edges, but tracing a **straight** 4–6-tile run across sections needs
+    line-continuation info (likely axial coords). For the runs slice.
 
 ## Design notes
 

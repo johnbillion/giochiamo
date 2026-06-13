@@ -109,8 +109,40 @@ Placing a section or a tile (from storage into your garden) has a **cost** that 
 _Examples:_ a **cost-3 section** = the section + one colour-matching tile + one coin (1+1+1). A
 **cost-6 tile** = the tile + three symbol-matching tiles/sections + two coins (1+3+2).
 
-_(Still to come — the **where**: which slot a section may fill, which space a tile may fill, and
-the adjacency rules.)_
+### Where things go (placement positions)
+Each player fills **their own** garden. Both placements — a section's identity tile, and a tile
+onto a section — obey one shared adjacency rule.
+
+- **Shared adjacency rule (face-adjacency only — corners don't count).** For **every
+  face-adjacent occupied position** of the tile being placed — a ring-neighbour within the same
+  section *or* the tile across a shared edge in a neighbouring section — the placed tile must
+  share **exactly one** of its colour/symbol with the tile there: **not neither** (no match) and
+  **not both** (exact duplicate). Empty adjacent positions never constrain.
+  - _e.g._ a **red flower** may sit beside a **red bird** (colour only) or a **blue flower**
+    (symbol only); but **not** a **blue bird** (no match) or another **red flower** (duplicate).
+
+- **Placing a section** — any **empty slot**, any **rotation**; need not touch an existing
+  section. Only the **identity** is on the section yet, so only its single face-adjacent
+  *other-section* neighbour can be occupied — apply the shared rule to it.
+
+- **Placing a tile** — onto an **empty space of a placed section** (you **cannot** place a tile on
+  an empty garden area with no section). Apply the shared rule across **all** its face-adjacent
+  positions: its section's ring-neighbours (including the identity) *and* the tile across any
+  shared edge.
+
+### Runs
+A **run** is a set of tiles (including a section's fixed identity tile) that form a **line**.
+Lines can **cross section boundaries**, and some are **circular**: the **6 slots around a single
+section**, and the **6 slots around the point where two adjacent ring sections meet the centre**.
+
+Placing a tile or a section must not break these run rules:
+1. **≤ 6 tiles of one colour** in a run.
+2. **≤ 6 tiles of one symbol** in a run.
+3. **No identical tiles** in a run.
+
+_(Given only 6 symbols/colours, rules 1–2 appear to follow from rule 3 + no-duplicates — confirm.)_
+_(A run of 4–6 tiles can span up to three sections, given the board topology.)_
+_(The exact set of lines — the "runs topology" — still needs precise definition; see model.md.)_
 
 ## Round scoring
 _(Pass 3 — how scoring resolves at the end of a round, incl. the scoring wheel.)_

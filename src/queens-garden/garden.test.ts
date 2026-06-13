@@ -61,17 +61,17 @@ describe('garden topology — tile adjacency', () => {
   });
 });
 
-describe('section rotation & the starter', () => {
-  it('rotation sets which board direction the identity faces', () => {
+describe('sections & the starter', () => {
+  it('reads the tile on a section slot (the identity is just a placed tile)', () => {
     const id: Tile = { colour: 'red', symbol: 'bird' };
-    const section: PlacedSection = { identity: id, rotation: 2, tiles: Array.from({ length: 6 }, () => null) };
-    expect(tileAt(section, 2)).toEqual(id); // identity faces its rotation
-    expect(tileAt(section, 0)).toBeNull(); // other directions empty
+    const section: PlacedSection = { tiles: [null, null, id, null, null, null] };
+    expect(tileAt(section, 2)).toEqual(id);
+    expect(tileAt(section, 0)).toBeNull();
   });
 
-  it('the starter garden has a blank centre and an empty ring', () => {
+  it('the starter garden has a blank centre section and an empty ring', () => {
     const g = createStarterGarden();
-    expect(g[0]).toEqual({ identity: null, rotation: 0, tiles: [null, null, null, null, null, null] });
+    expect(g[0]).toEqual({ tiles: [null, null, null, null, null, null] });
     expect(g.slice(1).every((slot) => slot === null)).toBe(true);
   });
 });
