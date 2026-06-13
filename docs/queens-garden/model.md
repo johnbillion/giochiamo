@@ -116,11 +116,12 @@ gets an entry — these are the future-bugs we're heading off.
     (c) you must take **all** distinct matching combos — no partial selection.
 19. **Coins** — **PARTIALLY RESOLVED:** coins live in the **tile storage area** and **count
     toward its 12-slot cap**; each player **starts with 3**. Earn/spend rules deferred.
-20. **Tile-area ordering** — the tile area is one **ordered `StorageItem[]`** (`tile | coin`), so
-    it's rearrangeable; order has **no gameplay effect** (`storageTiles`/`storageCoins` derive the
-    counts). Added a free **`reorder`** action — current player, must be a permutation, **no turn
-    cost**. *(Confirm: reorder is free & on your turn; off-turn / per-player reorder deferred.)*
-20. **Payment:** A user must pay to place tiles and sections from their storage into their play area. Need to define how payment works.
+20. **Storage ordering** — both storage areas are ordered: the tile area is a `StorageItem[]`
+    (`tile | coin`) and the section row is a `Section[]`. Order has **no gameplay effect**
+    (`storageTiles`/`storageCoins` derive counts). One free **`reorder`** action targets either
+    area (`area: 'tiles' | 'sections'`) — current player, must be a permutation, **no turn cost**.
+    *(Confirm: reorder is free & on your turn; off-turn / per-player reorder deferred.)*
+21. **Payment:** A user must pay to place tiles and sections from their storage into their play area. Need to define how payment works.
 
 ## Design notes
 

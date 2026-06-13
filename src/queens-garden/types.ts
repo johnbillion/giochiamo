@@ -110,12 +110,12 @@ export type DraftAction = {
   readonly picks: readonly TilePick[]; // exactly one per distinct matching combo
 };
 
-// Rearrange the current player's tile area (cosmetic — no gameplay effect). Free: it does not
-// consume the turn. `order` must be a permutation of the player's current tile area.
-export type ReorderAction = {
-  readonly type: typeof ActionType.Reorder;
-  readonly order: readonly StorageItem[];
-};
+// Rearrange one of the current player's storage areas — the tile area or the section row
+// (cosmetic, no gameplay effect). Free: it does not consume the turn. `order` must be a
+// permutation of that area's current contents.
+export type ReorderAction =
+  | { readonly type: typeof ActionType.Reorder; readonly area: 'tiles'; readonly order: readonly StorageItem[] }
+  | { readonly type: typeof ActionType.Reorder; readonly area: 'sections'; readonly order: readonly Section[] };
 
 // Placement effects are still stubbed (the placement rules come next).
 export type PlaceSectionAction = { readonly type: typeof ActionType.PlaceSection };

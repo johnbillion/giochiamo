@@ -78,6 +78,7 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
         '  g.placeTiles()     (stubbed) place tiles, ends your turn',
         '  g.pass()           pass for the rest of the round',
         '  g.move(from, to)   rearrange your tile storage (free, no turn cost)',
+        '  g.moveSection(f,t) rearrange your section storage (free)',
         '  g.draftable()      attributes you could draft right now',
         '  g.actions()        action kinds available right now',
         '  g.show()           reprint the current board',
@@ -95,7 +96,13 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
       const order = [...state.players[state.currentPlayer]!.storage.tileArea];
       const [item] = order.splice(from, 1);
       if (item) order.splice(to, 0, item);
-      return act({ type: ActionType.Reorder, order });
+      return act({ type: ActionType.Reorder, area: 'tiles', order });
+    },
+    moveSection: (from: number, to: number): State => {
+      const order = [...state.players[state.currentPlayer]!.storage.sections];
+      const [item] = order.splice(from, 1);
+      if (item) order.splice(to, 0, item);
+      return act({ type: ActionType.Reorder, area: 'sections', order });
     },
     placeSection: (): State => act({ type: ActionType.PlaceSection }),
     placeTiles: (): State => act({ type: ActionType.PlaceTiles }),

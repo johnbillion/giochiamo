@@ -13,6 +13,7 @@ import {
   type Colour,
   type Display,
   type PlayerState,
+  type Section,
   type State,
   type StorageItem,
   type Symbol,
@@ -198,24 +199,36 @@ describe('draft — legality', () => {
   });
 });
 
-describe('reorder — rearranging the tile area', () => {
+describe('reorder — rearranging storage', () => {
   it("permutes the current player's tile area without advancing the turn", () => {
     const items: StorageItem[] = [tileItem(tile('red', 'bird')), coinItem, tileItem(tile('blue', 'leaf'))];
     const p: PlayerState = { passed: false, score: 0, storage: { tileArea: items, sections: [] } };
     const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
 
     const order: StorageItem[] = [items[2]!, items[0]!, items[1]!];
-    const s1 = applyAction(s0, { type: ActionType.Reorder, order });
+    const s1 = applyAction(s0, { type: ActionType.Reorder, area: 'tiles', order });
 
     expect(s1.players[0]!.storage.tileArea).toEqual(order);
     expect(s1.currentPlayer).toBe(0); // free action — the turn did not pass
   });
 
-  it('rejects an order that is not a permutation of the tile area', () => {
+  it('permutes the section storage too', () => {
+    const a: Section = { identity: tile('red', 'bird') };
+    const b: Section = { identity: tile('blue', 'leaf') };
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [], sections: [a, b] } };
+    const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
+
+    const s1 = applyAction(s0, { type: ActionType.Reorder, area: 'sections', order: [b, a] });
+
+    expect(s1.players[0]!.storage.sections).toEqual([b, a]);
+    expect(s1.currentPlayer).toBe(0);
+  });
+
+  it('rejects an order that is not a permutation of the area', () => {
     const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [coinItem], sections: [] } };
     const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
 
-    const bogus: Action = { type: ActionType.Reorder, order: [tileItem(tile('red', 'bird'))] };
+    const bogus: Action = { type: ActionType.Reorder, area: 'tiles', order: [tileItem(tile('red', 'bird'))] };
     expect(isLegal(s0, bogus)).toBe(false);
   });
 });

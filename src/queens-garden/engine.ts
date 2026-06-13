@@ -207,33 +207,44 @@ function advanceTurn(state: State): State {
   return { ...state, currentPlayer: next };
 }
 
-function itemKey(item: StorageItem): string {
-  return item.kind === 'coin' ? 'coin' : `tile:${item.tile.colour}:${item.tile.symbol}`;
-}
-
-// True when `b` is a permutation of `a` (same items, any order).
-function sameMultiset(a: readonly StorageItem[], b: readonly StorageItem[]): boolean {
+// True when `b` is a permutation of `a` (same items by key, any order).
+function isPermutation<T>(a: readonly T[], b: readonly T[], key: (item: T) => string): boolean {
   if (a.length !== b.length) return false;
   const counts = new Map<string, number>();
-  for (const item of a) counts.set(itemKey(item), (counts.get(itemKey(item)) ?? 0) + 1);
+  for (const item of a) counts.set(key(item), (counts.get(key(item)) ?? 0) + 1);
   for (const item of b) {
-    const remaining = counts.get(itemKey(item)) ?? 0;
+    const remaining = counts.get(key(item)) ?? 0;
     if (remaining === 0) return false;
-    counts.set(itemKey(item), remaining - 1);
+    counts.set(key(item), remaining - 1);
   }
   return true;
 }
 
+function storageItemKey(item: StorageItem): string {
+  return item.kind === 'coin' ? 'coin' : `tile:${item.tile.colour}:${item.tile.symbol}`;
+}
+
+function sectionKey(section: Section): string {
+  return section.identity ? `${section.identity.colour}:${section.identity.symbol}` : 'blank';
+}
+
 function reorderIllegalReason(state: State, action: ReorderAction): string | null {
-  const current = state.players[state.currentPlayer]!.storage.tileArea;
-  return sameMultiset(current, action.order)
-    ? null
-    : 'a reorder must be a permutation of your tile area';
+  const { storage } = state.players[state.currentPlayer]!;
+  const ok =
+    action.area === 'tiles'
+      ? isPermutation(storage.tileArea, action.order, storageItemKey)
+      : isPermutation(storage.sections, action.order, sectionKey);
+  return ok ? null : `a reorder must be a permutation of your ${action.area}`;
 }
 
 function resolveReorder(state: State, action: ReorderAction): State {
-  const players = state.players.map((p, i) =>
-    i === state.currentPlayer ? { ...p, storage: { ...p.storage, tileArea: action.order } } : p,
-  );
+  const players = state.players.map((p, i) => {
+    if (i !== state.currentPlayer) return p;
+    const storage =
+      action.area === 'tiles'
+        ? { ...p.storage, tileArea: action.order }
+        : { ...p.storage, sections: action.order };
+    return { ...p, storage };
+  });
   return { ...state, players };
 }
