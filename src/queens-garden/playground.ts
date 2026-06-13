@@ -29,8 +29,12 @@ import {
 } from './types';
 
 const tileStr = (t: Tile): string => `${t.colour}/${t.symbol}`;
+const sectionStr = (s: Section): string => (s.identity ? tileStr(s.identity) : 'blank');
 const attrStr = (a: Attribute): string => (a.kind === 'colour' ? a.colour : a.symbol);
-const NO_PAYMENT: Payment = { tiles: [], sections: [], coins: 0 };
+
+// Console ergonomics: accept a partial payment (e.g. `{ coins: 2 }`) and fill in the rest, so the
+// untyped browser boundary doesn't crash the typed engine on a missing `tiles`/`sections`.
+const toPayment = (p: Partial<Payment> = {}): Payment => ({ tiles: [], sections: [], coins: 0, ...p });
 
 export function render(state: State): string {
   const phase = status(state);
@@ -41,9 +45,11 @@ export function render(state: State): string {
   state.players.forEach((p, i) => {
     const turn = phase === Phase.Playing && i === state.currentPlayer ? '>' : ' ';
     const passed = p.passed ? ' [passed]' : '';
-    lines.push(
-      `${turn} P${i}  score ${p.score}  storage ${storageTiles(p.storage).length}t/${p.storage.sections.length}s/${storageCoins(p.storage)}c${passed}`,
-    );
+    const tiles = storageTiles(p.storage);
+    const sections = p.storage.sections;
+    lines.push(`${turn} P${i}  score ${p.score}  ${storageCoins(p.storage)}c${passed}`);
+    lines.push(`    tiles (${tiles.length}): ${tiles.map(tileStr).join(', ') || '—'}`);
+    lines.push(`    sections (${sections.length}): ${sections.map(sectionStr).join(', ') || '—'}`);
   });
 
   lines.push('central:');
@@ -109,10 +115,10 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
       if (item) order.splice(to, 0, item);
       return act({ type: ActionType.Reorder, area: 'sections', order });
     },
-    placeSection: (section: Section, slot: SlotId, identityDir: Direction, payment: Payment = NO_PAYMENT): State =>
-      act({ type: ActionType.PlaceSection, section, slot, identityDir, payment }),
-    placeTile: (tile: Tile, slot: SlotId, dir: Direction, payment: Payment = NO_PAYMENT): State =>
-      act({ type: ActionType.PlaceTile, tile, slot, dir, payment }),
+    placeSection: (section: Section, slot: SlotId, identityDir: Direction, payment?: Partial<Payment>): State =>
+      act({ type: ActionType.PlaceSection, section, slot, identityDir, payment: toPayment(payment) }),
+    placeTile: (tile: Tile, slot: SlotId, dir: Direction, payment?: Partial<Payment>): State =>
+      act({ type: ActionType.PlaceTile, tile, slot, dir, payment: toPayment(payment) }),
     pass: (): State => act({ type: ActionType.Pass }),
     actions: (): ActionType[] => availableActionTypes(state),
     draftable: (): Attribute[] => draftableAttributes(state),
