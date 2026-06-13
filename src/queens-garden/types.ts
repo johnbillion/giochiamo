@@ -27,8 +27,11 @@ export type Tile = { readonly colour: Colour; readonly symbol: Symbol };
 // expansions). The central starter expansion has `identity: null` — all 6 spaces free.
 export type Expansion = { readonly identity: Tile | null };
 
-// A revealed expansion in the central area, plus the draftable tiles sitting on it.
-export type Display = { readonly expansion: Expansion; readonly tiles: readonly Tile[] };
+// A revealed expansion in the central area, plus the draftable tiles sitting on it. The tiles
+// array is positional: a fresh display holds 4 tiles, and a drafted tile leaves a `null` hole
+// behind so the survivors keep their slots. An expansion is emptied (takeable) once every slot
+// is null.
+export type Display = { readonly expansion: Expansion; readonly tiles: readonly (Tile | null)[] };
 
 export type CentralArea = {
   readonly top: Display | null; // current top of the pile (fresh = 4 tiles); null once exhausted

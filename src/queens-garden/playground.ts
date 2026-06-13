@@ -104,10 +104,11 @@ export function render(state: State): string {
   });
 
   lines.push('central:');
-  lines.push(`  top: ${state.central.top ? state.central.top.tiles.map(tileStr).join(', ') : '(empty)'}`);
+  const slotStr = (t: Tile | null): string => (t ? tileStr(t) : '·');
+  lines.push(`  top: ${state.central.top ? state.central.top.tiles.map(slotStr).join(', ') : '(empty)'}`);
   state.central.open.forEach((d, i) => {
-    const body = d.tiles.length
-      ? d.tiles.map(tileStr).join(', ')
+    const body = d.tiles.some(Boolean)
+      ? d.tiles.map(slotStr).join(', ')
       : `(expansion ${d.expansion.identity ? tileStr(d.expansion.identity) : 'starter'})`;
     lines.push(`  open[${i}]: ${body}`);
   });

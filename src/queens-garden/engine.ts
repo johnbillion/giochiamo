@@ -231,10 +231,11 @@ function endRound(state: State): State {
   };
 }
 
-// All tiles currently sitting in the central area (top batch + split-off leftovers).
+// All tiles currently sitting in the central area (top batch + split-off leftovers), skipping the
+// drafted-away holes.
 function centralTiles(central: CentralArea): Tile[] {
   const top = central.top ? central.top.tiles : [];
-  return [...top, ...central.open.flatMap((display) => display.tiles)];
+  return [...top, ...central.open.flatMap((display) => display.tiles)].filter((t): t is Tile => t !== null);
 }
 
 function advanceTurn(state: State): State {

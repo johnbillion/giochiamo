@@ -41,9 +41,11 @@ function makeState(central: CentralArea, opts: { bag?: Tile[]; players?: PlayerS
   };
 }
 
+// Count only real tiles — a drafted slot leaves a `null` hole that isn't a tile.
+const live = (tiles: readonly (unknown | null)[]): number => tiles.filter((t) => t !== null).length;
+
 function totalTiles(s: State): number {
-  const central =
-    (s.central.top?.tiles.length ?? 0) + s.central.open.reduce((n, d) => n + d.tiles.length, 0);
+  const central = (s.central.top ? live(s.central.top.tiles) : 0) + s.central.open.reduce((n, d) => n + live(d.tiles), 0);
   const storage = s.players.reduce((n, p) => n + storageTiles(p.storage).length, 0);
   return s.supply.bag.length + s.supply.discard.length + central + storage;
 }
@@ -66,7 +68,8 @@ describe('draft — taking tiles', () => {
 
     expect(storageTiles(s1.players[0]!.storage)).toHaveLength(2); // the two distinct reds
     expect(s1.central.open).toHaveLength(1); // old top split off…
-    expect(s1.central.open[0]!.tiles).toHaveLength(2); // …carrying its two leftovers
+    // …carrying its leftovers in their original slots, with holes where the reds were drafted
+    expect(s1.central.open[0]!.tiles).toEqual([null, null, tile('blue', 'bird'), tile('green', 'herb')]);
     expect(s1.central.top!.expansion.identity).toEqual(tile('orange', 'butterflies')); // next revealed
     expect(s1.central.top!.tiles).toHaveLength(4); // with a fresh batch
     expect(totalTiles(s1)).toBe(totalTiles(s0)); // conserved
@@ -87,7 +90,7 @@ describe('draft — taking tiles', () => {
 
     expect(storageTiles(s1.players[0]!.storage)).toEqual([tile('red', 'bird')]);
     expect(s1.central.top).toEqual(top); // untouched
-    expect(s1.central.open[0]!.tiles).toHaveLength(0); // emptied (takeable next turn)
+    expect(s1.central.open[0]!.tiles).toEqual([null]); // emptied (takeable next turn)
   });
 
   it('honours which copy the player takes (the source choice)', () => {
@@ -112,7 +115,7 @@ describe('draft — taking tiles', () => {
     expect(isLegal(s0, draft)).toBe(true);
     const s1 = applyAction(s0, draft);
     expect(s1.central.top).toEqual(top); // spared
-    expect(s1.central.open[0]!.tiles).toHaveLength(0);
+    expect(s1.central.open[0]!.tiles).toEqual([null]);
   });
 });
 

@@ -30,14 +30,24 @@ function matchesAttribute(tile: Tile, attr: Attribute): boolean {
   return attr.kind === 'colour' ? tile.colour === attr.colour : tile.symbol === attr.symbol;
 }
 
-// Every draftable tile in the central area, tagged with the display it sits on.
+// How many actual tiles a display still holds (its slots minus the drafted holes).
+function liveCount(tiles: readonly (Tile | null)[]): number {
+  return tiles.reduce((n, t) => (t !== null ? n + 1 : n), 0);
+}
+
+// True once every slot on a display has been drafted away — the point an expansion becomes takeable.
+function isEmptied(display: Display): boolean {
+  return display.tiles.every((t) => t === null);
+}
+
+// Every draftable tile in the central area, tagged with the display it sits on. Holes are skipped.
 function draftableTiles(central: CentralArea): { tile: Tile; source: DraftSource }[] {
   const out: { tile: Tile; source: DraftSource }[] = [];
   if (central.top) {
-    for (const tile of central.top.tiles) out.push({ tile, source: { area: 'top' } });
+    for (const tile of central.top.tiles) if (tile !== null) out.push({ tile, source: { area: 'top' } });
   }
   central.open.forEach((display, index) => {
-    for (const tile of display.tiles) out.push({ tile, source: { area: 'open', index } });
+    for (const tile of display.tiles) if (tile !== null) out.push({ tile, source: { area: 'open', index } });
   });
   return out;
 }
@@ -60,7 +70,7 @@ function matchingCombos(central: CentralArea, attr: Attribute): Tile[] {
 // Emptied (takeable) open expansions matching the attribute.
 function matchingExpansions(central: CentralArea, attr: Attribute): Expansion[] {
   return central.open
-    .filter((d) => d.tiles.length === 0 && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr))
+    .filter((d) => isEmptied(d) && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr))
     .map((d) => d.expansion);
 }
 
@@ -70,12 +80,13 @@ function displayAt(central: CentralArea, source: DraftSource): Display | null {
 
 function sourceHasTile(central: CentralArea, source: DraftSource, combo: Tile): boolean {
   const display = displayAt(central, source);
-  return display !== null && display.tiles.some((t) => sameTile(t, combo));
+  return display !== null && display.tiles.some((t) => t !== null && sameTile(t, combo));
 }
 
-function removeOne(tiles: Tile[], combo: Tile): void {
-  const i = tiles.findIndex((t) => sameTile(t, combo));
-  if (i >= 0) tiles.splice(i, 1);
+// Punch a hole where the combo sits, keeping the surviving tiles in their slots.
+function removeOne(tiles: (Tile | null)[], combo: Tile): void {
+  const i = tiles.findIndex((t) => t !== null && sameTile(t, combo));
+  if (i >= 0) tiles[i] = null;
 }
 
 // --- public API ---
@@ -116,8 +127,8 @@ export function resolveDraft(state: State, action: DraftAction): State {
   const attr = action.attribute;
   const source = state.central;
 
-  const topTiles = source.top ? [...source.top.tiles] : null;
-  const openTiles = source.open.map((d) => [...d.tiles]);
+  const topTiles: (Tile | null)[] | null = source.top ? [...source.top.tiles] : null;
+  const openTiles: (Tile | null)[][] = source.open.map((d) => [...d.tiles]);
 
   // 1. Remove each picked tile from its source.
   const takenTiles: Tile[] = [];
@@ -135,7 +146,7 @@ export function resolveDraft(state: State, action: DraftAction): State {
   const takenExpansions: Expansion[] = [];
   const takenIndices = new Set<number>();
   source.open.forEach((d, index) => {
-    if (d.tiles.length === 0 && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr)) {
+    if (isEmptied(d) && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr)) {
       takenExpansions.push(d.expansion);
       takenIndices.add(index);
     }
@@ -153,7 +164,7 @@ export function resolveDraft(state: State, action: DraftAction): State {
   let bag = [...state.supply.bag];
   let discard = [...state.supply.discard];
 
-  if (top !== null && top.tiles.length < 4) {
+  if (top !== null && liveCount(top.tiles) < 4) {
     open.push(top); // splits off, carrying its leftover tiles
     if (pile.length > 0) {
       const nextExpansion = pile.shift()!;
