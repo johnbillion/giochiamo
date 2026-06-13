@@ -147,9 +147,9 @@ identical tiles** into a run. After placing, no run (colour or symbol) passing *
 tile** may contain **two identical tiles** (same colour *and* symbol). Two identical tiles may sit
 within a few cells of each other, so long as **no single-attribute chain connects them**.
 
-- _e.g._ red/acorn — red/bird — red/acorn is **illegal** (one red run, two red/acorns). But
-  red/acorn — red/bird — blue/bird — blue/acorn — red/acorn is **fine**: the chain switches its
-  shared attribute partway, so neither a colour-run nor a symbol-run links the two red/acorns.
+- _e.g._ red/tree — red/bird — red/tree is **illegal** (one red run, two red/trees). But
+  red/tree — red/bird — blue/bird — blue/tree — red/tree is **fine**: the chain switches its
+  shared attribute partway, so neither a colour-run nor a symbol-run links the two red/trees.
 
 A run is at most **6 tiles** long, but that is a **consequence, not a separate rule**: a
 mono-colour run with no repeated tile holds at most 6 (only 6 symbols exist), and likewise a

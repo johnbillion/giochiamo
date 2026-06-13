@@ -16,12 +16,12 @@ export const COLOUR_HEX: Record<Colour, string> = {
 
 // The 6 symbols → a glyph each.
 export const SYMBOL_GLYPH: Record<Symbol, string> = {
-  acorn: '🌰',
+  tree: '🌰',
   bird: '🐦',
-  clover: '🍀',
+  butterflies: '🍀',
   flower: '🌸',
-  leaf: '🍃',
-  pinecone: '🌲',
+  herb: '🍃',
+  lily: '🌲',
 };
 
 // Grid position [grid-row, grid-column] of every tile slot, indexed [slot][dir]. Lifted from
