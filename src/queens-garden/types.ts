@@ -137,7 +137,9 @@ export type ReorderAction =
 export type Payment = {
   readonly tiles: readonly Tile[];
   readonly sections: readonly Section[];
-  readonly coins: number;
+  // Coins are a non-negative count, bounded by the largest possible cost (symbolCost maxes at 6,
+  // and the placed item counts as 1, so a payment never needs more than 5).
+  readonly coins: 0 | 1 | 2 | 3 | 4 | 5;
 };
 
 // Place a section into an empty garden slot, choosing which direction its identity faces.

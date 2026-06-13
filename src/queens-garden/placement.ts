@@ -49,7 +49,6 @@ function isMultisetSubset(needed: readonly string[], have: readonly string[]): b
 // Why a payment is structurally invalid for placing `ref`, or null. `ref` is the placed tile
 // (for a section, its identity), which counts as 1 toward the cost.
 function paymentStructureReason(ref: Tile, payment: Payment): string | null {
-  if (payment.coins < 0) return 'coins cannot be negative';
   const need = symbolCost(ref.symbol) - 1;
   if (payment.tiles.length + payment.sections.length + payment.coins !== need) {
     return `payment must total ${need}`;
