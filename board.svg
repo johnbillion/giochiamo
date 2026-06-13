@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 440">
+  <defs>
+    <polygon id="hex" points="0,-30 25.98,-15 25.98,15 0,30 -25.98,15 -25.98,-15"/>
+  </defs>
+  <g fill="#000" stroke="#fff" stroke-width="2" stroke-linejoin="round">
+    <!-- Central rosette (6 hexes around empty centre at 240,220) -->
+    <use href="#hex" x="291.96" y="220"/>
+    <use href="#hex" x="265.98" y="265"/>
+    <use href="#hex" x="214.02" y="265"/>
+    <use href="#hex" x="188.04" y="220"/>
+    <use href="#hex" x="214.02" y="175"/>
+    <use href="#hex" x="265.98" y="175"/>
+    <!-- Right rosette (around empty centre at 3,0) -->
+    <use href="#hex" x="447.85" y="220"/>
+    <use href="#hex" x="421.87" y="265"/>
+    <use href="#hex" x="369.90" y="265"/>
+    <use href="#hex" x="343.92" y="220"/>
+    <use href="#hex" x="369.90" y="175"/>
+    <use href="#hex" x="421.87" y="175"/>
+    <!-- Upper-right rosette (around empty centre at 3,-3) -->
+    <use href="#hex" x="369.90" y="85"/>
+    <use href="#hex" x="343.92" y="130"/>
+    <use href="#hex" x="291.96" y="130"/>
+    <use href="#hex" x="265.98" y="85"/>
+    <use href="#hex" x="291.96" y="40"/>
+    <use href="#hex" x="343.92" y="40"/>
+    <!-- Upper-left rosette (around empty centre at 0,-3) -->
+    <use href="#hex" x="214.02" y="85"/>
+    <use href="#hex" x="188.04" y="130"/>
+    <use href="#hex" x="136.08" y="130"/>
+    <use href="#hex" x="110.10" y="85"/>
+    <use href="#hex" x="136.08" y="40"/>
+    <use href="#hex" x="188.04" y="40"/>
+    <!-- Left rosette (around empty centre at -3,0) -->
+    <use href="#hex" x="136.08" y="220"/>
+    <use href="#hex" x="110.10" y="265"/>
+    <use href="#hex" x="58.13" y="265"/>
+    <use href="#hex" x="32.15" y="220"/>
+    <use href="#hex" x="58.13" y="175"/>
+    <use href="#hex" x="110.10" y="175"/>
+    <!-- Lower-left rosette (around empty centre at -3,3) -->
+    <use href="#hex" x="214.02" y="355"/>
+    <use href="#hex" x="188.04" y="400"/>
+    <use href="#hex" x="136.08" y="400"/>
+    <use href="#hex" x="110.10" y="355"/>
+    <use href="#hex" x="136.08" y="310"/>
+    <use href="#hex" x="188.04" y="310"/>
+    <!-- Lower-right rosette (around empty centre at 0,3) -->
+    <use href="#hex" x="369.90" y="355"/>
+    <use href="#hex" x="343.92" y="400"/>
+    <use href="#hex" x="291.96" y="400"/>
+    <use href="#hex" x="265.98" y="355"/>
+    <use href="#hex" x="291.96" y="310"/>
+    <use href="#hex" x="343.92" y="310"/>
+  </g>
+</svg>

@@ -44,21 +44,50 @@ export const SYMBOL_LABEL: Record<Symbol, string> = {
   lily: 'Lily',
 };
 
-// Grid position [grid-row, grid-column] of every tile slot, indexed [slot][dir]. Lifted from
-// the playground's ASCII layout (which was derived from the true board geometry), so the picture
-// mirrors real adjacency: the centre expansion in the middle, the six ring expansions around it.
-export const SLOT_LAYOUT: readonly (readonly (readonly [number, number])[])[] = [
-  [[8, 5], [7, 4], [6, 4], [5, 5], [6, 6], [7, 6]], // slot 0 (centre)
-  [[12, 5], [11, 4], [10, 4], [9, 5], [10, 6], [11, 6]], // slot 1
-  [[10, 2], [9, 1], [8, 1], [7, 2], [8, 3], [9, 3]], // slot 2
-  [[6, 2], [5, 1], [4, 1], [3, 2], [4, 3], [5, 3]], // slot 3
-  [[4, 5], [3, 4], [2, 4], [1, 5], [2, 6], [3, 6]], // slot 4
-  [[6, 8], [5, 7], [4, 7], [3, 8], [4, 9], [5, 9]], // slot 5
-  [[10, 8], [9, 7], [8, 7], [7, 8], [8, 9], [9, 9]], // slot 6
+// --- garden board geometry (pointy-top hexagons, in a flower-of-flowers) ---
+// Each expansion is a ring of six tiles around a hollow centre; the seven expansion centres are
+// themselves arranged as a flower. Everything is expressed in axial (q, r) coordinates for a
+// pointy-top hex grid, and projected to pixels by axialToPixel().
+
+// Axial offset of each tile slot (dir 0..5) from its expansion's centre hole, ordered clockwise
+// from the top-right. (The engine cares only about the dir index; this just decides where we draw
+// it.)
+export const DIR_AXIAL: readonly (readonly [number, number])[] = [
+  [-1, 1], // 0 — SW
+  [-1, 0], // 1 — W
+  [0, -1], // 2 — NW
+  [1, -1], // 3 — NE
+  [1, 0], //  4 — E
+  [0, 1], //  5 — SE
 ];
 
-export const GRID_ROWS = 12;
-export const GRID_COLS = 9;
+// Axial centre of each expansion's hole: slot 0 in the middle, slots 1..6 around it at hex-distance
+// 3 in the six cardinal axial directions (per queens-garden-board-layout.md / AQG-min.svg). The
+// seven rosettes of 6 stay distinct — they don't share hexes — and form a flat-top hex-of-hexes.
+export const SLOT_CENTRE: readonly (readonly [number, number])[] = [
+  [0, 0], //   centre
+  [3, 0], //   right
+  [3, -3], //  upper-right
+  [0, -3], //  upper-left
+  [-3, 0], //  left
+  [-3, 3], //  lower-left
+  [0, 3], //   lower-right
+];
+
+// Pointy-top axial (q, r) → pixel centre, given the hexagon circumradius R.
+export function axialToPixel(q: number, r: number, R: number): readonly [number, number] {
+  return [R * Math.sqrt(3) * (q + r / 2), R * 1.5 * r];
+}
+
+// The six corners of a pointy-top hexagon (circumradius R, centred at cx,cy) as an SVG points list.
+export function hexPoints(cx: number, cy: number, R: number): string {
+  const corners: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 180) * (90 + 60 * i); // start at the top point, step 60°
+    corners.push(`${(cx + R * Math.cos(a)).toFixed(2)},${(cy - R * Math.sin(a)).toFixed(2)}`);
+  }
+  return corners.join(' ');
+}
 
 export function tileLabel(tile: Tile): string {
   return `${COLOUR_LABEL[tile.colour]} ${SYMBOL_LABEL[tile.symbol]}`;
@@ -70,19 +99,38 @@ export function expansionLabel(expansion: Expansion): string {
     : 'blank';
 }
 
-// A single tile face: a coloured square with its symbol glyph. `size` is the side length in px.
-export function TileFace({ tile, size = 34 }: { tile: Tile; size?: number }) {
+// A regular pointy-top hexagon is √3/2 as wide as it is tall, so the box width is scaled to keep
+// the proportions correct (the CSS clip-path then fills it exactly). `size` is the height in px.
+const HEX_RATIO = Math.sqrt(3) / 2; // ≈ 0.866, width ÷ height of a regular pointy-top hexagon
+
+// The shared face primitive: a coloured pointy-top hexagon with an optional centred glyph.
+function HexFace({
+  fill,
+  glyph,
+  size,
+  title,
+}: {
+  fill: string;
+  glyph?: string;
+  size: number;
+  title?: string;
+}) {
   return (
     <span
       className="tile-face"
-      style={{
-        background: COLOUR_HEX[tile.colour],
-        width: size,
-        height: size,
-        fontSize: size * 0.55,
-      }}
+      title={title}
+      style={{ background: fill, width: size * HEX_RATIO, height: size, fontSize: size * 0.5 }}
     >
-      {SYMBOL_GLYPH[tile.symbol]}
+      {glyph}
     </span>
   );
+}
+
+export function TileFace({ tile, size = 34 }: { tile: Tile; size?: number }) {
+  return <HexFace fill={COLOUR_HEX[tile.colour]} glyph={SYMBOL_GLYPH[tile.symbol]} size={size} />;
+}
+
+// A coin, drawn as a plain silver hexagon (a wildcard payment piece).
+export function CoinFace({ size = 34 }: { size?: number }) {
+  return <HexFace fill="#c7ccd4" size={size} title="coin (wildcard payment)" />;
 }

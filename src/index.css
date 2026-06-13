@@ -58,16 +58,18 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-/* coloured tile face with a symbol glyph */
+/* coloured pointy-top hexagonal tile face with a symbol glyph */
 .tile-face {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
   line-height: 1;
   vertical-align: middle;
   cursor: default;
+  /* Point on top and bottom; flat edges on the left and right. */
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  /* clip-path would crop an inset border, so trace the hexagon edge with a drop-shadow instead. */
+  filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.45));
 }
 
 /* --- central area --- */
@@ -100,10 +102,18 @@ button:disabled {
   margin-bottom: 4px;
 }
 .tiles {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
   gap: 4px;
-  flex-wrap: wrap;
+  justify-content: start;
   min-height: 30px;
+}
+
+/* An emptied slot where a tile was drafted away — holds its place in the 2×2 grid. */
+.tile-blank {
+  display: inline-flex;
+  width: 56px;
+  height: 56px;
 }
 
 /* A central-area tile with a hover popup offering to draft by its colour or symbol. */
@@ -244,36 +254,24 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* --- garden grid --- */
+/* --- garden board (SVG of pointy-top hex flowers) --- */
 .garden {
-  display: grid;
-  justify-content: center;
-  gap: 2px;
+  display: block;
   margin: 8px auto;
-  width: max-content;
+  width: 100%;
+  height: auto;
 }
-.cell {
-  border: none;
-  background: transparent;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  color: #cbd5e1;
-}
-.cell.no-expansion {
-  background: #f8fafc;
-  box-shadow: inset 0 0 0 1px #f1f5f9;
-}
-.cell.empty-space {
-  background: #eef2ff;
-  box-shadow: inset 0 0 0 1px #e0e7ff;
-}
-.cell.legal {
-  box-shadow: inset 0 0 0 2px #22c55e;
-  background: #dcfce7;
+.gcell.legal {
   cursor: pointer;
+}
+/* Outline any tile slot on hover as an affordance. */
+.gcell:hover polygon {
+  stroke: #6366f1;
+  stroke-width: 2;
+}
+.gglyph {
+  pointer-events: none;
+  user-select: none;
 }
 
 /* --- storage --- */

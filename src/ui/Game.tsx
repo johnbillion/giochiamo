@@ -14,7 +14,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode,
 } from 'react';
 import {
   applyAction,
@@ -47,12 +46,14 @@ import {
 } from '../queens-garden/types';
 import { submit, type GameDispatch } from '../transport/submit';
 import {
+  axialToPixel,
   COLOUR_HEX,
   COLOUR_LABEL,
-  GRID_COLS,
-  GRID_ROWS,
+  CoinFace,
+  DIR_AXIAL,
   expansionLabel,
-  SLOT_LAYOUT,
+  hexPoints,
+  SLOT_CENTRE,
   SYMBOL_GLYPH,
   SYMBOL_LABEL,
   TileFace,
@@ -574,12 +575,16 @@ function CentralArea({
   // Every tile currently in the central area — the pool a draft draws from, and the basis for the
   // per-attribute counts shown in each tile's popup.
   const allTiles: Tile[] = [];
-  if (central.top) allTiles.push(...central.top.tiles);
-  for (const d of central.open) allTiles.push(...d.tiles);
+  if (central.top) for (const t of central.top.tiles) if (t) allTiles.push(t);
+  for (const d of central.open) for (const t of d.tiles) if (t) allTiles.push(t);
 
-  // A draft is only offered during play; otherwise tiles are plain (non-interactive) faces.
-  const renderTile = (t: Tile, key: number) =>
-    canDraft ? (
+  // A draft is only offered during play; otherwise tiles are plain (non-interactive) faces. A
+  // null is a slot whose tile has been drafted away — rendered as an empty cell so the surviving
+  // tiles keep their positions in the 2×2 grid.
+  const renderTile = (t: Tile | null, key: number) =>
+    t === null ? (
+      <span key={key} className="tile-blank" aria-hidden="true" />
+    ) : canDraft ? (
       <DraftableTile
         key={key}
         tile={t}
@@ -608,12 +613,12 @@ function CentralArea({
         <div className="display" key={i}>
           <span className="display-label">
             Open {i + 1}
-            {d.tiles.length === 0 && d.expansion.identity
+            {!d.tiles.some(Boolean) && d.expansion.identity
               ? ` — ${expansionLabel(d.expansion)} expansion (takeable)`
               : ''}
           </span>
           <div className="tiles">
-            {d.tiles.length
+            {d.tiles.some(Boolean)
               ? d.tiles.map((t, j) => renderTile(t, j))
               : <em>{d.expansion.identity ? expansionLabel(d.expansion) : 'starter'} expansion</em>}
           </div>
@@ -683,7 +688,7 @@ function PlayerPanel({
                     disabled={!active}
                     onClick={() => onTileItem(i)}
                   >
-                    🪙
+                    <CoinFace size={60} />
                   </button>
                 );
               }
@@ -729,42 +734,99 @@ function Garden({
   placing: boolean;
   onCell: (slot: SlotId, dir: Direction) => void;
 }) {
-  const cells: ReactNode[] = [];
-  SLOT_LAYOUT.forEach((dirs, slot) => {
+  const R = 18; // hex circumradius in px
+
+  // Project every (slot, dir) tile slot to a pixel centre and capture its state, tracking the
+  // bounding box so the SVG viewBox hugs the whole flower-of-flowers.
+  type Cell = {
+    slot: number;
+    dir: number;
+    cx: number;
+    cy: number;
+    tile: Tile | null;
+    hasExpansion: boolean;
+    legal: boolean;
+  };
+  const cells: Cell[] = [];
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  SLOT_CENTRE.forEach((centre, slot) => {
     const expansion = player.garden[slot];
-    dirs.forEach(([row, col], dir) => {
-      const tile = expansion ? expansion.tiles[dir] ?? null : null;
-      const isLegalTarget = active && placing && legalTargets.has(`${slot}:${dir}`);
-      const empty = expansion ? !tile : false;
-      const cls = [
-        'cell',
-        expansion ? (tile ? 'filled' : 'empty-space') : 'no-expansion',
-        isLegalTarget ? 'legal' : '',
-      ]
-        .filter(Boolean)
-        .join(' ');
-      cells.push(
-        <button
-          key={`${slot}:${dir}`}
-          className={cls}
-          style={{ gridRow: row, gridColumn: col }}
-          disabled={!isLegalTarget}
-          onClick={() => isLegalTarget && onCell(slot as SlotId, dir as Direction)}
-        >
-          {tile ? <TileFace tile={tile} size={30} /> : empty ? '·' : ''}
-        </button>,
-      );
+    DIR_AXIAL.forEach(([dq, dr], dir) => {
+      const [cx, cy] = axialToPixel(centre[0] + dq, centre[1] + dr, R);
+      minX = Math.min(minX, cx);
+      maxX = Math.max(maxX, cx);
+      minY = Math.min(minY, cy);
+      maxY = Math.max(maxY, cy);
+      cells.push({
+        slot,
+        dir,
+        cx,
+        cy,
+        tile: expansion ? expansion.tiles[dir] ?? null : null,
+        hasExpansion: !!expansion,
+        legal: active && placing && legalTargets.has(`${slot}:${dir}`),
+      });
     });
   });
+
+  const padX = (R * Math.sqrt(3)) / 2 + 2;
+  const padY = R + 2;
+  const width = maxX - minX + 2 * padX;
+  const height = maxY - minY + 2 * padY;
+  const viewBox = `${(minX - padX).toFixed(2)} ${(minY - padY).toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)}`;
+
   return (
-    <div
-      className="garden"
-      style={{
-        gridTemplateRows: `repeat(${GRID_ROWS}, 34px)`,
-        gridTemplateColumns: `repeat(${GRID_COLS}, 34px)`,
-      }}
-    >
-      {cells}
-    </div>
+    <svg className="garden" viewBox={viewBox} aria-label="garden board">
+      {cells.map((c) => {
+        // Fill/stroke mirror the old cell states: legal target, empty slot of a placed expansion,
+        // an unplaced expansion slot, or a filled tile.
+        let fill: string;
+        let stroke: string;
+        let strokeWidth = 1.5;
+        if (c.legal) {
+          fill = '#86efac';
+          stroke = '#15803d';
+          strokeWidth = 2.5;
+        } else if (!c.hasExpansion) {
+          fill = '#cbd5e1';
+          stroke = '#94a3b8';
+        } else if (!c.tile) {
+          fill = '#a5b4fc';
+          stroke = '#6366f1';
+        } else {
+          fill = COLOUR_HEX[c.tile.colour];
+          stroke = 'rgba(0, 0, 0, 0.4)';
+        }
+        return (
+          <g
+            key={`${c.slot}:${c.dir}`}
+            className={c.legal ? 'gcell legal' : 'gcell'}
+            onClick={c.legal ? () => onCell(c.slot as SlotId, c.dir as Direction) : undefined}
+          >
+            <polygon
+              points={hexPoints(c.cx, c.cy, R)}
+              fill={fill}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+            />
+            {c.tile && (
+              <text
+                className="gglyph"
+                x={c.cx}
+                y={c.cy}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={R}
+              >
+                {SYMBOL_GLYPH[c.tile.symbol]}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
