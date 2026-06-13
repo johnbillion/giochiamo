@@ -144,27 +144,26 @@ gets an entry — these are the future-bugs we're heading off.
     (`tile | coin`) and the section row is a `Section[]`. Order has **no gameplay effect**
     (`storageTiles`/`storageCoins` derive counts). One free **`reorder`** action targets either
     area (`area: 'tiles' | 'sections'`) — current player, must be a permutation, **no turn cost**.
-21. **Payment:** A user must pay to place tiles and sections from their storage into their play area.
-    Need to define how payment works.
+21. ~~Payment — a user must pay to place tiles and sections from storage into their play area;
+    how does paying work?~~ **RESOLVED:** cost = the placed item's **symbol index (1–6)**,
+    *inclusive of the item itself*. Pay the remaining `cost − 1` with **matching items** (sharing
+    the placed item's colour *or* symbol — one axis, drafting-style, no duplicates) and/or
+    **coins** (each a wildcard worth 1). All payment items + coins are discarded. *Consequence:*
+    the **SYMBOLS order is now game-relevant** (it sets cost) — update the "arbitrary names" note
+    when codifying, via a `symbolCost(symbol) = index + 1` helper.
 22. ~~Round end is automatic (condition-discovered)?~~ **RESOLVED:** When the pass that makes *everyone* passed
     resolves, `applyAction` runs round scoring (first-passer −1 for now) **and** the round
     transition in the same step — there's no explicit "end round" action. The transition
     **discards the central area's leftover tiles** and **deals a fresh pile** (n sections + 4
     tiles) for the next round via the shared `dealRound`. Game-over after round 4 falls out of the
     same path. *(Fixes the earlier carry-over stub, now that the draft consumes the central area.)*
-22. **Placement cost & payment — RESOLVED:** cost = the placed item's **symbol index (1–6)**,
-    *inclusive of the item itself*. Pay the remaining `cost − 1` with **matching items** (sharing
-    the placed item's colour *or* symbol — one axis, drafting-style, no duplicates) and/or
-    **coins** (each a wildcard worth 1). All payment items + coins are discarded. *Consequence:*
-    the **SYMBOLS order is now game-relevant** (it sets cost) — update the "arbitrary names" note
-    when codifying, via a `symbolCost(symbol) = index + 1` helper.
-23. **Placement assumptions — now implemented (flag if any are wrong):** (a) non-coin payment
+23. ~~Placement assumptions~~ — **now implemented** ~~(flag if any are wrong):~~ (a) non-coin payment
     items all match the placed item on a **single axis** ✓; (b) no payment item may equal the
     placed item ✓; (c) discard destinations — payment **tiles → discard pile**, **sections & coins
     → out of play** (no coin bank modelled) ✓; (d) **one** item placed per place action ✓; (e) the
     "where" is resolved (#25/#26/#27). All codified in `placement.ts`.
 
-24. **Garden topology + the rotation question (feeds placement).** The 7 section-slots form a
+24. ~~Garden topology + the rotation question (feeds placement).~~ The 7 section-slots form a
     hex flower: the **centre is adjacent to all 6** ring slots; each **ring slot** is adjacent to
     the centre + its **2 ring-neighbours** (degree 3). Proposed representation: index every tile
     position as **(slot 0–6, direction 0–5)**. Within a section, ring adjacency is `dir ± 1 mod
@@ -178,7 +177,7 @@ gets an entry — these are the future-bugs we're heading off.
     `PlacedSection` / `Garden` / `SlotId` / `Direction` types in `types.ts`, all unit-tested.
     *The `garden` field is wired into `PlayerState` with the placement slice.*
 
-25. **Per-player gardens + section-placement adjacency — RESOLVED:** gardens are **per-player**.
+25. ~~Per-player gardens + section-placement adjacency~~ — **RESOLVED:** gardens are **per-player**.
     A section goes in **any empty slot** at a chosen **rotation**; legal iff the **identity**
     faces only empty space, or an other-section tile (fixed/placed) sharing **exactly one**
     attribute (colour **xor** symbol) — facing **neither** (no match) *or* **both** (exact
@@ -186,14 +185,14 @@ gets an entry — these are the future-bugs we're heading off.
     the identity has exactly **one** other-section neighbour: `(neighbourSlot(slot, rot), rot+3)`.
     *(Tile-placement constraint, the "runs" rule, + further rules still to come.)*
 
-26. **Tile placement = the generalized adjacency rule — RESOLVED:** a tile goes on an **empty
+26. ~~Tile placement = the generalized adjacency rule~~ — **RESOLVED:** a tile goes on an **empty
     space of a placed section** (never a section-less area); legal iff it shares **exactly one**
     attribute (colour xor symbol) with **every** face-adjacent occupied tile — its section's ring
     neighbours (incl. the identity) and the cross-edge tile. This is the same predicate as #25;
     section placement is just the case where only the cross-edge neighbour can be occupied. One
     helper covers both: `adjacentPositions` + `tileAt` + a `shareExactlyOne` check.
 
-27. **Runs — topology CORRECTED (supersedes the earlier fixed-lines model).** A *run* is a chain
+27. ~~Runs — topology~~ **CORRECTED** ~~(supersedes the earlier fixed-lines model).~~ A *run* is a chain
     of face-adjacent tiles **all sharing one attribute** — all one colour, or all one symbol —
     following the adjacency graph **freely** (rounding rings, crossing section edges); it is **not**
     an arc along a fixed set of lines. The placement constraint is a single rule: placing must not
@@ -210,7 +209,7 @@ gets an entry — these are the future-bugs we're heading off.
     arcs whose tiles don't actually share one attribute. The `LINES`/`runsThrough` machinery and its
     tests were deleted; `adjacentPositions` (the traversal primitive) and `tileAtPosition` stay.
 
-28. **Board = hex cells; identity is just a tile (simplification) — RESOLVED.** The screenshot
+28. ~~Board = hex cells; identity is just a tile (simplification)~~ — **RESOLVED.** The screenshot
     confirms tiles are hex **cells** (6 ringing each of the 7 holes) and a tile touches **one**
     cross-section neighbour — validating the degree-3 adjacency already in `garden.ts` (no rebuild).
     **Simplification:** `PlacedSection` is now just `{ tiles: (Tile|null)[6] }` — no stored
@@ -220,7 +219,7 @@ gets an entry — these are the future-bugs we're heading off.
     `place tile`). *Run tracing:* runs are **mono-attribute chains over the adjacency graph**
     (`monoRun` / `joinsIdenticalTiles` in `placement.ts`), **not** arcs of fixed rings — see #27.
 
-29. **Placement codified.** `place section` / `place tile` (`placement.ts`): target valid (empty
+29. ~~Placement~~ **codified.** `place section` / `place tile` (`placement.ts`): target valid (empty
     slot / empty space of a placed section) → shared adjacency rule (exactly-one attribute with
     each face neighbour) → no run joins two identical tiles (`joinsIdenticalTiles`) → valid payment (cost =
     symbol index, inclusive of the placed item; matching items + coin wildcards) → apply. `garden`
@@ -228,7 +227,7 @@ gets an entry — these are the future-bugs we're heading off.
     item (necessary, not sufficient — concrete legality is `illegalReason`). Tested: free & paid
     placement, adjacency (match-one / mismatch), run duplicates, underpayment, section placement.
 
-30. **Coins — earning RESOLVED (spending was #22).** A player earns coins by placing the tile that
+30. ~~Coins — earning~~ **RESOLVED** ~~(spending was #21).~~ A player earns coins by placing the tile that
     **completes a 6-tile region** (the sixth tile): **centre section → 1**, **a ring section → 3**,
     **a junction gap → 2** (the 6 holes where two adjacent ring sections meet the centre, ringed by
     2 centre + 2+2 ring petals). Bonuses **stack** — one tile can complete several overlapping
