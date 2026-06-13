@@ -9,6 +9,7 @@ import {
   STORAGE_SECTION_LIMIT,
   STORAGE_TILE_LIMIT,
   SYMBOLS,
+  tileItem,
   type Attribute,
   type CentralArea,
   type Display,
@@ -119,7 +120,7 @@ export function draftIllegalReason(state: State, action: DraftAction): string | 
       return 'a chosen source does not hold that tile';
     }
   }
-  if (combos.length > STORAGE_TILE_LIMIT - player.storage.tiles.length - player.storage.coins) {
+  if (combos.length > STORAGE_TILE_LIMIT - player.storage.tileArea.length) {
     return 'not enough tile storage for that draft';
   }
   if (sections.length > STORAGE_SECTION_LIMIT - player.storage.sections.length) {
@@ -192,7 +193,7 @@ export function resolveDraft(state: State, action: DraftAction): State {
           ...p,
           storage: {
             ...p.storage,
-            tiles: [...p.storage.tiles, ...takenTiles],
+            tileArea: [...p.storage.tileArea, ...takenTiles.map(tileItem)],
             sections: [...p.storage.sections, ...takenSections],
           },
         }

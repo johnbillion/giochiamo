@@ -6,6 +6,7 @@
 
 import {
   ActionType,
+  coinItem,
   COLOURS,
   Phase,
   ROUND_COUNT,
@@ -16,8 +17,10 @@ import {
   type CentralArea,
   type Display,
   type PlayerState,
+  type ReorderAction,
   type Section,
   type State,
+  type StorageItem,
   type Supply,
   type Tile,
 } from './types';
@@ -80,7 +83,7 @@ export function createInitialState(
   const players: PlayerState[] = Array.from({ length: playerCount }, () => ({
     passed: false,
     score: 0,
-    storage: { tiles: [], sections: [], coins: STARTING_COINS },
+    storage: { tileArea: Array.from({ length: STARTING_COINS }, () => coinItem), sections: [] },
   }));
 
   return {
@@ -107,6 +110,8 @@ export function illegalReason(state: State, action: Action): string | null {
   switch (action.type) {
     case ActionType.Draft:
       return draftIllegalReason(state, action);
+    case ActionType.Reorder:
+      return reorderIllegalReason(state, action);
     case ActionType.PlaceSection:
     case ActionType.PlaceTiles:
       // Placement preconditions arrive with the placement rules.
@@ -126,7 +131,12 @@ export function isLegal(state: State, action: Action): boolean {
 // to construct a specific draft. The parameterless actions are simply listed.
 export function availableActionTypes(state: State): ActionType[] {
   if (status(state) !== Phase.Playing) return [];
-  const kinds: ActionType[] = [ActionType.PlaceSection, ActionType.PlaceTiles, ActionType.Pass];
+  const kinds: ActionType[] = [
+    ActionType.Reorder,
+    ActionType.PlaceSection,
+    ActionType.PlaceTiles,
+    ActionType.Pass,
+  ];
   if (draftableAttributes(state).length > 0) kinds.unshift(ActionType.Draft);
   return kinds;
 }
@@ -140,6 +150,9 @@ export function applyAction(state: State, action: Action): State {
   switch (action.type) {
     case ActionType.Draft:
       return advanceTurn(resolveDraft(state, action));
+    case ActionType.Reorder:
+      // Rearranging your tile area is free — it does not pass the turn.
+      return resolveReorder(state, action);
     case ActionType.Pass:
       return resolvePass(state);
     case ActionType.PlaceSection:
@@ -192,4 +205,35 @@ function advanceTurn(state: State): State {
     next = (next + 1) % count;
   }
   return { ...state, currentPlayer: next };
+}
+
+function itemKey(item: StorageItem): string {
+  return item.kind === 'coin' ? 'coin' : `tile:${item.tile.colour}:${item.tile.symbol}`;
+}
+
+// True when `b` is a permutation of `a` (same items, any order).
+function sameMultiset(a: readonly StorageItem[], b: readonly StorageItem[]): boolean {
+  if (a.length !== b.length) return false;
+  const counts = new Map<string, number>();
+  for (const item of a) counts.set(itemKey(item), (counts.get(itemKey(item)) ?? 0) + 1);
+  for (const item of b) {
+    const remaining = counts.get(itemKey(item)) ?? 0;
+    if (remaining === 0) return false;
+    counts.set(itemKey(item), remaining - 1);
+  }
+  return true;
+}
+
+function reorderIllegalReason(state: State, action: ReorderAction): string | null {
+  const current = state.players[state.currentPlayer]!.storage.tileArea;
+  return sameMultiset(current, action.order)
+    ? null
+    : 'a reorder must be a permutation of your tile area';
+}
+
+function resolveReorder(state: State, action: ReorderAction): State {
+  const players = state.players.map((p, i) =>
+    i === state.currentPlayer ? { ...p, storage: { ...p.storage, tileArea: action.order } } : p,
+  );
+  return { ...state, players };
 }

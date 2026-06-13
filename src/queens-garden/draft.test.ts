@@ -4,13 +4,17 @@ import { applyAction, isLegal } from './engine';
 import { buildDraft } from './draft';
 import {
   ActionType,
+  coinItem,
   STORAGE_TILE_LIMIT,
+  storageTiles,
+  tileItem,
   type Action,
   type CentralArea,
   type Colour,
   type Display,
   type PlayerState,
   type State,
+  type StorageItem,
   type Symbol,
   type Tile,
 } from './types';
@@ -19,7 +23,7 @@ const tile = (colour: Colour, symbol: Symbol): Tile => ({ colour, symbol });
 const emptyPlayer = (): PlayerState => ({
   passed: false,
   score: 0,
-  storage: { tiles: [], sections: [], coins: 0 },
+  storage: { tileArea: [], sections: [] },
 });
 
 function makeState(central: CentralArea, opts: { bag?: Tile[]; players?: PlayerState[] } = {}): State {
@@ -37,7 +41,7 @@ function makeState(central: CentralArea, opts: { bag?: Tile[]; players?: PlayerS
 function totalTiles(s: State): number {
   const central =
     (s.central.top?.tiles.length ?? 0) + s.central.open.reduce((n, d) => n + d.tiles.length, 0);
-  const storage = s.players.reduce((n, p) => n + p.storage.tiles.length, 0);
+  const storage = s.players.reduce((n, p) => n + storageTiles(p.storage).length, 0);
   return s.supply.bag.length + s.supply.discard.length + central + storage;
 }
 
@@ -57,7 +61,7 @@ describe('draft — taking tiles', () => {
 
     const s1 = applyAction(s0, buildDraft(s0, { kind: 'colour', colour: 'red' }));
 
-    expect(s1.players[0]!.storage.tiles).toHaveLength(2); // the two distinct reds
+    expect(storageTiles(s1.players[0]!.storage)).toHaveLength(2); // the two distinct reds
     expect(s1.central.open).toHaveLength(1); // old top split off…
     expect(s1.central.open[0]!.tiles).toHaveLength(2); // …carrying its two leftovers
     expect(s1.central.top!.section.identity).toEqual(tile('orange', 'clover')); // next revealed
@@ -78,7 +82,7 @@ describe('draft — taking tiles', () => {
 
     const s1 = applyAction(s0, buildDraft(s0, { kind: 'colour', colour: 'red' }));
 
-    expect(s1.players[0]!.storage.tiles).toEqual([tile('red', 'bird')]);
+    expect(storageTiles(s1.players[0]!.storage)).toEqual([tile('red', 'bird')]);
     expect(s1.central.top).toEqual(top); // untouched
     expect(s1.central.open[0]!.tiles).toHaveLength(0); // emptied (takeable next turn)
   });
@@ -123,7 +127,7 @@ describe('draft — taking sections', () => {
     const s1 = applyAction(s0, buildDraft(s0, { kind: 'colour', colour: 'red' }));
 
     expect(s1.players[0]!.storage.sections).toEqual([{ identity: tile('red', 'flower') }]);
-    expect(s1.players[0]!.storage.tiles).toHaveLength(0);
+    expect(storageTiles(s1.players[0]!.storage)).toHaveLength(0);
     expect(s1.central.open).toHaveLength(0); // the section was taken
   });
 });
@@ -134,9 +138,8 @@ describe('draft — legality', () => {
       passed: false,
       score: 0,
       storage: {
-        tiles: Array.from({ length: STORAGE_TILE_LIMIT - 1 }, () => tile('blue', 'bird')),
+        tileArea: Array.from({ length: STORAGE_TILE_LIMIT - 1 }, () => tileItem(tile('blue', 'bird'))),
         sections: [],
-        coins: 0,
       },
     };
     const s0 = makeState(
@@ -161,7 +164,10 @@ describe('draft — legality', () => {
     const cramped: PlayerState = {
       passed: false,
       score: 0,
-      storage: { tiles: Array.from({ length: 10 }, () => tile('blue', 'bird')), sections: [], coins: 1 },
+      storage: {
+        tileArea: [...Array.from({ length: 10 }, () => tileItem(tile('blue', 'bird'))), coinItem],
+        sections: [],
+      },
     };
     const s0 = makeState(
       {
@@ -189,5 +195,27 @@ describe('draft — legality', () => {
     });
 
     expect(isLegal(s0, buildDraft(s0, { kind: 'colour', colour: 'red' }))).toBe(false);
+  });
+});
+
+describe('reorder — rearranging the tile area', () => {
+  it("permutes the current player's tile area without advancing the turn", () => {
+    const items: StorageItem[] = [tileItem(tile('red', 'bird')), coinItem, tileItem(tile('blue', 'leaf'))];
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: items, sections: [] } };
+    const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
+
+    const order: StorageItem[] = [items[2]!, items[0]!, items[1]!];
+    const s1 = applyAction(s0, { type: ActionType.Reorder, order });
+
+    expect(s1.players[0]!.storage.tileArea).toEqual(order);
+    expect(s1.currentPlayer).toBe(0); // free action — the turn did not pass
+  });
+
+  it('rejects an order that is not a permutation of the tile area', () => {
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [coinItem], sections: [] } };
+    const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
+
+    const bogus: Action = { type: ActionType.Reorder, order: [tileItem(tile('red', 'bird'))] };
+    expect(isLegal(s0, bogus)).toBe(false);
   });
 });

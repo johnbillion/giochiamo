@@ -14,6 +14,8 @@ import {
   ActionType,
   Phase,
   ROUND_COUNT,
+  storageCoins,
+  storageTiles,
   type Action,
   type Attribute,
   type Colour,
@@ -35,7 +37,7 @@ export function render(state: State): string {
     const turn = phase === Phase.Playing && i === state.currentPlayer ? '>' : ' ';
     const passed = p.passed ? ' [passed]' : '';
     lines.push(
-      `${turn} P${i}  score ${p.score}  storage ${p.storage.tiles.length}t/${p.storage.sections.length}s/${p.storage.coins}c${passed}`,
+      `${turn} P${i}  score ${p.score}  storage ${storageTiles(p.storage).length}t/${p.storage.sections.length}s/${storageCoins(p.storage)}c${passed}`,
     );
   });
 
@@ -75,6 +77,7 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
         '  g.placeSection()   (stubbed) place a section, ends your turn',
         '  g.placeTiles()     (stubbed) place tiles, ends your turn',
         '  g.pass()           pass for the rest of the round',
+        '  g.move(from, to)   rearrange your tile storage (free, no turn cost)',
         '  g.draftable()      attributes you could draft right now',
         '  g.actions()        action kinds available right now',
         '  g.show()           reprint the current board',
@@ -88,6 +91,12 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
     draft: (attribute: Attribute): State => act(buildDraft(state, attribute)),
     draftColour: (colour: Colour): State => act(buildDraft(state, { kind: 'colour', colour })),
     draftSymbol: (symbol: Symbol): State => act(buildDraft(state, { kind: 'symbol', symbol })),
+    move: (from: number, to: number): State => {
+      const order = [...state.players[state.currentPlayer]!.storage.tileArea];
+      const [item] = order.splice(from, 1);
+      if (item) order.splice(to, 0, item);
+      return act({ type: ActionType.Reorder, order });
+    },
     placeSection: (): State => act({ type: ActionType.PlaceSection }),
     placeTiles: (): State => act({ type: ActionType.PlaceTiles }),
     pass: (): State => act({ type: ActionType.Pass }),

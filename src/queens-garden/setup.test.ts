@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createInitialState } from './engine';
-import { COLOURS, STARTING_COINS, SYMBOLS, type State } from './types';
+import { COLOURS, STARTING_COINS, SYMBOLS, storageCoins, storageTiles, type State } from './types';
 
 // Tiles visible right after the deal: bag + discard + whatever sits in the central area.
 function tilesInPlay(state: State): number {
@@ -37,8 +37,8 @@ describe('initial deal', () => {
 
   it('gives each player their starting coins in the (otherwise empty) tile storage', () => {
     const s = createInitialState(3, 1);
-    expect(s.players.every((p) => p.storage.coins === STARTING_COINS)).toBe(true);
-    expect(s.players.every((p) => p.storage.tiles.length === 0)).toBe(true);
+    expect(s.players.every((p) => storageCoins(p.storage) === STARTING_COINS)).toBe(true);
+    expect(s.players.every((p) => storageTiles(p.storage).length === 0)).toBe(true);
   });
 
   it('is deterministic: same seed → identical deal, different seed → different', () => {

@@ -44,11 +44,26 @@ export const STORAGE_TILE_LIMIT = 12; // the tile area holds tiles AND coins, up
 export const STORAGE_SECTION_LIMIT = 2;
 export const STARTING_COINS = 3;
 
+// The tile-storage area is one ordered list of items — tiles and coins interleaved — so a
+// player can rearrange it. The order has no gameplay effect; it's purely for human comfort.
+export type StorageItem =
+  | { readonly kind: 'tile'; readonly tile: Tile }
+  | { readonly kind: 'coin' };
+
 export type PlayerStorage = {
-  readonly tiles: readonly Tile[];
+  readonly tileArea: readonly StorageItem[]; // tiles + coins; length ≤ STORAGE_TILE_LIMIT
   readonly sections: readonly Section[]; // ≤ STORAGE_SECTION_LIMIT
-  readonly coins: number; // coins live in the tile area; tiles.length + coins ≤ STORAGE_TILE_LIMIT
 };
+
+export const coinItem: StorageItem = { kind: 'coin' };
+export const tileItem = (tile: Tile): StorageItem => ({ kind: 'tile', tile });
+
+export function storageTiles(storage: PlayerStorage): Tile[] {
+  return storage.tileArea.flatMap((item) => (item.kind === 'tile' ? [item.tile] : []));
+}
+export function storageCoins(storage: PlayerStorage): number {
+  return storage.tileArea.reduce((n, item) => n + (item.kind === 'coin' ? 1 : 0), 0);
+}
 
 export type PlayerId = number; // 0-based index into State.players
 
@@ -71,6 +86,7 @@ export type State = {
 
 export const ActionType = {
   Draft: 'draft',
+  Reorder: 'reorder',
   PlaceSection: 'place-section',
   PlaceTiles: 'place-tiles',
   Pass: 'pass',
@@ -94,9 +110,21 @@ export type DraftAction = {
   readonly picks: readonly TilePick[]; // exactly one per distinct matching combo
 };
 
+// Rearrange the current player's tile area (cosmetic — no gameplay effect). Free: it does not
+// consume the turn. `order` must be a permutation of the player's current tile area.
+export type ReorderAction = {
+  readonly type: typeof ActionType.Reorder;
+  readonly order: readonly StorageItem[];
+};
+
 // Placement effects are still stubbed (the placement rules come next).
 export type PlaceSectionAction = { readonly type: typeof ActionType.PlaceSection };
 export type PlaceTilesAction = { readonly type: typeof ActionType.PlaceTiles };
 export type PassAction = { readonly type: typeof ActionType.Pass };
 
-export type Action = DraftAction | PlaceSectionAction | PlaceTilesAction | PassAction;
+export type Action =
+  | DraftAction
+  | ReorderAction
+  | PlaceSectionAction
+  | PlaceTilesAction
+  | PassAction;
