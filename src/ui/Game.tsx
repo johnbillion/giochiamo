@@ -14,6 +14,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from 'react';
 import {
   applyAction,
@@ -33,6 +34,8 @@ import {
   storageTiles,
   type Action,
   type Attribute,
+  type Colour,
+  type Symbol,
   type Direction,
   type Payment,
   type PlaceExpansionAction,
@@ -52,6 +55,7 @@ import {
   CoinFace,
   DIR_AXIAL,
   expansionLabel,
+  ExpansionFace,
   hexPoints,
   SLOT_CENTRE,
   SYMBOL_GLYPH,
@@ -433,37 +437,40 @@ function GameOver({ players }: { players: readonly PlayerState[] }) {
 
 // A central-area tile that, on hover, offers to draft by its colour or its symbol. Each button
 // shows how many tiles across the whole central area share that attribute, e.g. "Blue (3)".
-function DraftableTile({
-  tile,
-  size,
+function DraftablePiece({
+  colour,
+  symbol,
+  face,
   dimmed,
-  allTiles,
   draftable,
   onDraft,
   onPreview,
+  countFor,
 }: {
-  tile: Tile;
-  size: number;
+  colour: Colour;
+  symbol: Symbol;
+  face: ReactNode; // the visual (a TileFace or ExpansionFace)
   dimmed: boolean;
-  allTiles: readonly Tile[];
   draftable: ReadonlySet<string>;
   onDraft: (attr: Attribute) => void;
   onPreview: (attr: Attribute | null) => void;
+  // How many draftable pieces (tiles + takeable expansions) in the central area share an attribute.
+  countFor: (attr: Attribute) => number;
 }) {
-  const colourCount = allTiles.filter((t) => t.colour === tile.colour).length;
-  const symbolCount = allTiles.filter((t) => t.symbol === tile.symbol).length;
-  const colourEnabled = draftable.has(`c:${tile.colour}`);
-  const symbolEnabled = draftable.has(`s:${tile.symbol}`);
+  const colourCount = countFor({ kind: 'colour', colour });
+  const symbolCount = countFor({ kind: 'symbol', symbol });
+  const colourEnabled = draftable.has(`c:${colour}`);
+  const symbolEnabled = draftable.has(`s:${symbol}`);
 
-  // When this tile is the only one of its colour AND the only one of its symbol, a colour draft and
-  // a symbol draft would both take exactly this single tile. Collapse the two-button popup into one
-  // "Select …" affordance, and let the player click the tile itself as well as the popup message.
+  // When this piece is the only one of its colour AND the only one of its symbol, a colour draft and
+  // a symbol draft would both take exactly this single piece. Collapse the two-button popup into one
+  // "Select …" affordance, and let the player click the piece itself as well as the popup message.
   const solo = colourCount === 1 && symbolCount === 1;
-  const soloAttr: Attribute = { kind: 'colour', colour: tile.colour };
-  const soloEnabled = colourEnabled; // identical to symbolEnabled for a solo tile
+  const soloAttr: Attribute = { kind: 'colour', colour };
+  const soloEnabled = colourEnabled; // identical to symbolEnabled for a solo piece
 
   // The popup is hover-driven, but a click must dismiss it even though the cursor is still over the
-  // tile. So we gate it on React state: open on hover, and force closed on click until the pointer
+  // piece. So we gate it on React state: open on hover, and force closed on click until the pointer
   // leaves and returns.
   const [open, setOpen] = useState(false);
   const close = () => {
@@ -475,8 +482,8 @@ function DraftableTile({
     close();
   };
 
-  // The popup is centred under the tile, which can run off the left/right edge of the viewport for
-  // tiles near a screen edge. Once it's shown, measure it and nudge it horizontally back into view.
+  // The popup is centred under the piece, which can run off the left/right edge of the viewport for
+  // pieces near a screen edge. Once it's shown, measure it and nudge it horizontally back into view.
   const popupRef = useRef<HTMLSpanElement>(null);
   const [shift, setShift] = useState(0);
   useLayoutEffect(() => {
@@ -503,7 +510,7 @@ function DraftableTile({
       onMouseLeave={close}
       onClick={solo && soloEnabled ? () => pick(soloAttr) : undefined}
     >
-      <TileFace tile={tile} size={size} />
+      {face}
       <span
         className="tile-popup"
         ref={popupRef}
@@ -518,29 +525,29 @@ function DraftableTile({
               pick(soloAttr);
             }}
           >
-            {COLOUR_LABEL[tile.colour]} {SYMBOL_LABEL[tile.symbol]} (1)
+            {COLOUR_LABEL[colour]} {SYMBOL_LABEL[symbol]} (1)
           </button>
         ) : (
           <>
             <button
               className="draft-chip draft-chip-colour"
-              data-colour={tile.colour}
+              data-colour={colour}
               disabled={!colourEnabled}
-              onClick={() => pick({ kind: 'colour', colour: tile.colour })}
-              onMouseEnter={() => onPreview({ kind: 'colour', colour: tile.colour })}
+              onClick={() => pick({ kind: 'colour', colour })}
+              onMouseEnter={() => onPreview({ kind: 'colour', colour })}
               onMouseLeave={() => onPreview(null)}
-              style={{ background: colourEnabled ? COLOUR_HEX[tile.colour] : undefined }}
+              style={{ background: colourEnabled ? COLOUR_HEX[colour] : undefined }}
             >
-              {COLOUR_LABEL[tile.colour]} ({colourCount})
+              {COLOUR_LABEL[colour]} ({colourCount})
             </button>
             <button
               className="draft-chip"
               disabled={!symbolEnabled}
-              onClick={() => pick({ kind: 'symbol', symbol: tile.symbol })}
-              onMouseEnter={() => onPreview({ kind: 'symbol', symbol: tile.symbol })}
+              onClick={() => pick({ kind: 'symbol', symbol })}
+              onMouseEnter={() => onPreview({ kind: 'symbol', symbol })}
               onMouseLeave={() => onPreview(null)}
             >
-              {SYMBOL_GLYPH[tile.symbol]} {SYMBOL_LABEL[tile.symbol]} ({symbolCount})
+              {SYMBOL_GLYPH[symbol]} {SYMBOL_LABEL[symbol]} ({symbolCount})
             </button>
           </>
         )}
@@ -572,32 +579,64 @@ function CentralArea({
     preview === null ||
     (preview.kind === 'colour' ? t.colour === preview.colour : t.symbol === preview.symbol);
 
-  // Every tile currently in the central area — the pool a draft draws from, and the basis for the
-  // per-attribute counts shown in each tile's popup.
+  // Every tile currently in the central area, plus the takeable (emptied) expansions — the pool a
+  // draft draws from, and the basis for the per-attribute counts shown in each popup. Drafting an
+  // attribute sweeps up BOTH the matching tiles and the matching takeable expansions, so the count
+  // must include expansions too.
   const allTiles: Tile[] = [];
   if (central.top) for (const t of central.top.tiles) if (t) allTiles.push(t);
   for (const d of central.open) for (const t of d.tiles) if (t) allTiles.push(t);
+  const takeableExpansions: Tile[] = central.open
+    .filter((d) => !d.tiles.some(Boolean) && d.expansion.identity)
+    .map((d) => d.expansion.identity!);
 
-  // A draft is only offered during play; otherwise tiles are plain (non-interactive) faces. A
+  const countFor = (attr: Attribute): number => {
+    const match = (t: Tile) =>
+      attr.kind === 'colour' ? t.colour === attr.colour : t.symbol === attr.symbol;
+    return allTiles.filter(match).length + takeableExpansions.filter(match).length;
+  };
+
+  // A draft is only offered during play; otherwise pieces are plain (non-interactive) faces. A
   // null is a slot whose tile has been drafted away — rendered as an empty cell so the surviving
   // tiles keep their positions in the 2×2 grid.
   const renderTile = (t: Tile | null, key: number) =>
     t === null ? (
       <span key={key} className="tile-blank" aria-hidden="true" />
     ) : canDraft ? (
-      <DraftableTile
+      <DraftablePiece
         key={key}
-        tile={t}
-        size={56}
+        colour={t.colour}
+        symbol={t.symbol}
+        face={<TileFace tile={t} size={56} />}
         dimmed={!matchesPreview(t)}
-        allTiles={allTiles}
         draftable={draftable}
         onDraft={onDraft}
         onPreview={setPreview}
+        countFor={countFor}
       />
     ) : (
       <TileFace key={key} tile={t} size={56} />
     );
+
+  // A takeable expansion is drafted the same way as a tile (by its identity's colour or symbol).
+  const renderExpansion = (expansion: Expansion, key: number) => {
+    const face = <ExpansionFace expansion={expansion} size={20} />;
+    const id = expansion.identity;
+    if (!canDraft || !id) return <span key={key}>{face}</span>;
+    return (
+      <DraftablePiece
+        key={key}
+        colour={id.colour}
+        symbol={id.symbol}
+        face={face}
+        dimmed={!matchesPreview(id)}
+        draftable={draftable}
+        onDraft={onDraft}
+        onPreview={setPreview}
+        countFor={countFor}
+      />
+    );
+  };
 
   return (
     <div className="displays" style={{ '--displays': maxPiles } as CSSProperties}>
@@ -620,7 +659,7 @@ function CentralArea({
           <div className="tiles">
             {d.tiles.some(Boolean)
               ? d.tiles.map((t, j) => renderTile(t, j))
-              : <em>{d.expansion.identity ? expansionLabel(d.expansion) : 'starter'} expansion</em>}
+              : renderExpansion(d.expansion, 0)}
           </div>
         </div>
       ))}
@@ -710,7 +749,7 @@ function PlayerPanel({
               const cls = `item expansion${isPlaced ? ' placed' : ''}${isPay ? ' pay' : ''}`;
               return (
                 <button key={i} className={cls} disabled={!active} onClick={() => onExpansionItem(i)}>
-                  {s.identity ? <TileFace tile={s.identity} size={60} /> : <em>blank</em>}
+                  <ExpansionFace expansion={s} size={18} />
                 </button>
               );
             })}

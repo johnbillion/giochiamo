@@ -134,3 +134,54 @@ export function TileFace({ tile, size = 34 }: { tile: Tile; size?: number }) {
 export function CoinFace({ size = 34 }: { size?: number }) {
   return <HexFace fill="#c7ccd4" size={size} title="coin (wildcard payment)" />;
 }
+
+// An expansion piece, drawn as a miniature rosette — the same shape it takes on the board: six
+// pointy-top hexes ringing a hollow centre. One slot holds the expansion's identity tile (its
+// colour + symbol); the other five are empty. A starter expansion (no identity) has all six empty.
+const EXPANSION_IDENTITY_SLOT = 2; // which ring slot shows the identity tile (top-left)
+
+export function ExpansionFace({ expansion, size = 18 }: { expansion: Expansion; size?: number }) {
+  const id = expansion.identity;
+  const r = size; // circumradius of each hex in the rosette
+  const cells = DIR_AXIAL.map(([q, rr], i) => {
+    const [cx, cy] = axialToPixel(q, rr, r);
+    return { cx, cy, i };
+  });
+  const halfW = (r * Math.sqrt(3)) / 2;
+  const pad = 1.5;
+  const minX = Math.min(...cells.map((c) => c.cx)) - halfW - pad;
+  const maxX = Math.max(...cells.map((c) => c.cx)) + halfW + pad;
+  const minY = Math.min(...cells.map((c) => c.cy)) - r - pad;
+  const maxY = Math.max(...cells.map((c) => c.cy)) + r + pad;
+  const w = maxX - minX;
+  const h = maxY - minY;
+  return (
+    <svg
+      className="expansion-face"
+      viewBox={`${minX.toFixed(2)} ${minY.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`}
+      width={w.toFixed(2)}
+      height={h.toFixed(2)}
+      role="img"
+      aria-label={`${expansionLabel(expansion)} expansion`}
+    >
+      {cells.map((c) => {
+        const isId = id !== null && c.i === EXPANSION_IDENTITY_SLOT;
+        return (
+          <g key={c.i}>
+            <polygon
+              points={hexPoints(c.cx, c.cy, r)}
+              fill={isId ? COLOUR_HEX[id.colour] : '#e2e8f0'}
+              stroke={isId ? 'rgba(0, 0, 0, 0.4)' : '#cbd5e1'}
+              strokeWidth={1.5}
+            />
+            {isId && (
+              <text x={c.cx} y={c.cy} textAnchor="middle" dominantBaseline="central" fontSize={r}>
+                {SYMBOL_GLYPH[id.symbol]}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}

@@ -72,6 +72,12 @@ button:disabled {
   filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.45));
 }
 
+/* an expansion piece: a miniature rosette (six hexes around a hollow centre) */
+.expansion-face {
+  display: inline-block;
+  vertical-align: middle;
+}
+
 /* --- central area --- */
 .central {
   background: #fff;
