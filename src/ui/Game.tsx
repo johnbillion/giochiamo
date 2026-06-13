@@ -30,6 +30,8 @@ import {
   ActionType,
   Phase,
   ROUND_COUNT,
+  STORAGE_EXPANSION_LIMIT,
+  STORAGE_TILE_LIMIT,
   storageCoins,
   storageTiles,
   type Action,
@@ -62,6 +64,7 @@ import {
   SYMBOL_GLYPH,
   SYMBOL_LABEL,
   TileFace,
+  TileSlot,
 } from './board';
 
 const PLAYER_COUNT = 2;
@@ -717,11 +720,8 @@ function PlayerPanel({
       />
 
       <div className="storage">
-        <div className="storage-row">
-          <span className="storage-label">Tiles</span>
-          <div className="items">
-            {player.storage.tileArea.length === 0 && <em>empty</em>}
-            {player.storage.tileArea.map((item, i) => {
+        <div className="items tile-items">
+          {player.storage.tileArea.map((item, i) => {
               const isPlaced = active && sel.mode === 'tile' && sel.idx === i;
               const isPay = active && payTiles.has(i);
               const cls = `item${isPlaced ? ' placed' : ''}${isPay ? ' pay' : ''}`;
@@ -743,12 +743,13 @@ function PlayerPanel({
                 </button>
               );
             })}
-          </div>
+            {Array.from({ length: STORAGE_TILE_LIMIT - player.storage.tileArea.length }).map((_, k) => (
+              <span className="slot" key={`slot-${k}`} aria-hidden="true">
+                <TileSlot size={60} />
+              </span>
+            ))}
         </div>
-        <div className="storage-row">
-          <span className="storage-label">Expansions</span>
-          <div className="items">
-            {player.storage.expansions.length === 0 && <em>empty</em>}
+        <div className="items expansion-items">
             {player.storage.expansions.map((s, i) => {
               const isPlaced = active && sel.mode === 'expansion' && sel.idx === i;
               const isPay = active && paySecs.has(i);
@@ -759,7 +760,13 @@ function PlayerPanel({
                 </button>
               );
             })}
-          </div>
+            {Array.from({ length: STORAGE_EXPANSION_LIMIT - player.storage.expansions.length }).map(
+              (_, k) => (
+                <span className="slot" key={`slot-${k}`} aria-hidden="true">
+                  <ExpansionFace expansion={{ identity: null }} size={18} />
+                </span>
+              ),
+            )}
         </div>
       </div>
     </div>

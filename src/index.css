@@ -78,6 +78,12 @@ button:disabled {
   vertical-align: middle;
 }
 
+/* an empty storage slot: a faint, flat hexagon placeholder (no edge shadow) */
+.tile-slot {
+  background: #eef0f3;
+  filter: none;
+}
+
 /* --- central area --- */
 .central {
   background: #fff;
@@ -275,8 +281,8 @@ button:disabled {
 .gcell.legal {
   cursor: pointer;
 }
-/* Outline any tile slot on hover as an affordance. */
-.gcell:hover polygon {
+/* Outline a legal target on hover as a placement affordance (legal cells exist only while placing). */
+.gcell.legal:hover polygon {
   stroke: #6366f1;
   stroke-width: 2;
 }
@@ -286,26 +292,29 @@ button:disabled {
 }
 
 /* --- storage --- */
+/* Tile grid on the left, the two expansion slots stacked vertically beside it. */
 .storage {
   margin-top: 8px;
-}
-.storage-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 6px 0;
-  min-height: 36px;
-}
-.storage-label {
-  font-size: 0.75rem;
-  color: #64748b;
-  width: 64px;
+  align-items: flex-start;
+  gap: 14px;
 }
 .items {
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
   align-items: center;
+}
+/* The tile area holds up to 12 slots — lay them out as 3 rows of 4. */
+.tile-items {
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+  place-items: center;
+}
+/* The two expansion slots stack vertically. */
+.expansion-items {
+  flex-direction: column;
+  flex-wrap: nowrap;
 }
 .item {
   border: 1px solid transparent;
@@ -317,6 +326,12 @@ button:disabled {
 .item:not(:disabled):hover {
   border-color: #94a3b8;
   background: #f1f5f9;
+}
+/* a non-interactive empty-slot placeholder, inset to match the .item button box */
+.slot {
+  display: inline-flex;
+  padding: 3px;
+  opacity: 0.7;
 }
 .item.coin {
   font-size: 2.8rem;

@@ -168,6 +168,13 @@ export function TileFace({ tile, size = 34 }: { tile: Tile; size?: number }) {
   return <HexFace fill={COLOUR_HEX[tile.colour]} glyph={SYMBOL_GLYPH[tile.symbol]} size={size} />;
 }
 
+// An empty tile slot: a faint hexagon placeholder marking unused storage capacity.
+export function TileSlot({ size = 34 }: { size?: number }) {
+  return (
+    <span className="tile-face tile-slot" style={{ width: size * HEX_RATIO, height: size }} />
+  );
+}
+
 // A coin, drawn as a plain silver hexagon (a wildcard payment piece).
 export function CoinFace({ size = 34 }: { size?: number }) {
   return <HexFace fill="#c7ccd4" size={size} title="coin (wildcard payment)" />;
