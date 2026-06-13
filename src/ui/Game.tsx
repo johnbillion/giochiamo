@@ -7,7 +7,15 @@
 //   - the resulting state                      → applyAction
 // The UI's only job is to build candidate Actions from clicks and hand them to the engine.
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import {
   applyAction,
   availableActionTypes,
@@ -343,7 +351,7 @@ export function Game() {
       {phase === Phase.GameOver && <GameOver players={state.players} />}
 
       <section className="central">
-        <h2>Central area</h2>
+        <h2 className="visually-hidden">Central area</h2>
         <CentralArea
           state={state}
           draftable={draftable}
@@ -446,6 +454,13 @@ function DraftableTile({
   const colourEnabled = draftable.has(`c:${tile.colour}`);
   const symbolEnabled = draftable.has(`s:${tile.symbol}`);
 
+  // When this tile is the only one of its colour AND the only one of its symbol, a colour draft and
+  // a symbol draft would both take exactly this single tile. Collapse the two-button popup into one
+  // "Select …" affordance, and let the player click the tile itself as well as the popup message.
+  const solo = colourCount === 1 && symbolCount === 1;
+  const soloAttr: Attribute = { kind: 'colour', colour: tile.colour };
+  const soloEnabled = colourEnabled; // identical to symbolEnabled for a solo tile
+
   // The popup is hover-driven, but a click must dismiss it even though the cursor is still over the
   // tile. So we gate it on React state: open on hover, and force closed on click until the pointer
   // leaves and returns.
@@ -459,34 +474,75 @@ function DraftableTile({
     close();
   };
 
+  // The popup is centred under the tile, which can run off the left/right edge of the viewport for
+  // tiles near a screen edge. Once it's shown, measure it and nudge it horizontally back into view.
+  const popupRef = useRef<HTMLSpanElement>(null);
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    if (!open || !popupRef.current) {
+      setShift(0);
+      return;
+    }
+    const rect = popupRef.current.getBoundingClientRect();
+    const margin = 8;
+    if (rect.left < margin) setShift(margin - rect.left);
+    else if (rect.right > window.innerWidth - margin) setShift(window.innerWidth - margin - rect.right);
+    else setShift(0);
+  }, [open]);
+
   return (
     <span
-      className={`draft-tile${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}`}
-      onMouseEnter={() => setOpen(true)}
+      className={`draft-tile${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}${
+        solo && soloEnabled ? ' clickable' : ''
+      }`}
+      onMouseEnter={() => {
+        setOpen(true);
+        if (solo) onPreview(soloAttr);
+      }}
       onMouseLeave={close}
+      onClick={solo && soloEnabled ? () => pick(soloAttr) : undefined}
     >
       <TileFace tile={tile} size={size} />
-      <span className="tile-popup">
-        <button
-          className="draft-chip draft-chip-colour"
-          data-colour={tile.colour}
-          disabled={!colourEnabled}
-          onClick={() => pick({ kind: 'colour', colour: tile.colour })}
-          onMouseEnter={() => onPreview({ kind: 'colour', colour: tile.colour })}
-          onMouseLeave={() => onPreview(null)}
-          style={{ background: colourEnabled ? COLOUR_HEX[tile.colour] : undefined }}
-        >
-          {COLOUR_LABEL[tile.colour]} ({colourCount})
-        </button>
-        <button
-          className="draft-chip"
-          disabled={!symbolEnabled}
-          onClick={() => pick({ kind: 'symbol', symbol: tile.symbol })}
-          onMouseEnter={() => onPreview({ kind: 'symbol', symbol: tile.symbol })}
-          onMouseLeave={() => onPreview(null)}
-        >
-          {SYMBOL_GLYPH[tile.symbol]} {SYMBOL_LABEL[tile.symbol]} ({symbolCount})
-        </button>
+      <span
+        className="tile-popup"
+        ref={popupRef}
+        style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
+      >
+        {solo ? (
+          <button
+            className="draft-chip"
+            disabled={!soloEnabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              pick(soloAttr);
+            }}
+          >
+            {COLOUR_LABEL[tile.colour]} {SYMBOL_LABEL[tile.symbol]} (1)
+          </button>
+        ) : (
+          <>
+            <button
+              className="draft-chip draft-chip-colour"
+              data-colour={tile.colour}
+              disabled={!colourEnabled}
+              onClick={() => pick({ kind: 'colour', colour: tile.colour })}
+              onMouseEnter={() => onPreview({ kind: 'colour', colour: tile.colour })}
+              onMouseLeave={() => onPreview(null)}
+              style={{ background: colourEnabled ? COLOUR_HEX[tile.colour] : undefined }}
+            >
+              {COLOUR_LABEL[tile.colour]} ({colourCount})
+            </button>
+            <button
+              className="draft-chip"
+              disabled={!symbolEnabled}
+              onClick={() => pick({ kind: 'symbol', symbol: tile.symbol })}
+              onMouseEnter={() => onPreview({ kind: 'symbol', symbol: tile.symbol })}
+              onMouseLeave={() => onPreview(null)}
+            >
+              {SYMBOL_GLYPH[tile.symbol]} {SYMBOL_LABEL[tile.symbol]} ({symbolCount})
+            </button>
+          </>
+        )}
       </span>
     </span>
   );

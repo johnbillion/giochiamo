@@ -115,40 +115,46 @@ button:disabled {
 .draft-tile.dimmed {
   opacity: 0.15;
 }
+/* A solo tile (only one of its colour and symbol) is itself the draft button. */
+.draft-tile.clickable,
+.draft-tile.clickable .tile-face {
+  cursor: pointer;
+}
 .tile-popup {
   position: absolute;
   top: 100%;
   left: 50%;
-  transform: translateX(-50%);
   display: none;
-  gap: 6px;
-  padding: 6px;
+  gap: 0;
+  padding: 0;
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   z-index: 20;
+  /* Clip the flush-fitting buttons to the popup's rounded outline so only the outer corners curve. */
+  overflow: hidden;
 }
 .draft-tile.open .tile-popup {
   display: flex;
 }
 .draft-chip {
-  border: 1px solid #cbd5e1;
-  border-radius: 999px;
-  padding: 3px 12px;
+  border: none;
+  border-radius: 0;
+  padding: 6px 14px;
   background: #fff;
-  text-transform: capitalize;
   color: #1e293b;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A hairline divider where the two buttons meet. */
+.draft-chip + .draft-chip {
+  border-left: 1px solid #e2e8f0;
+}
 .draft-chip:not(:disabled):hover {
-  border-color: #94a3b8;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   filter: brightness(1.08);
-  transform: translateY(-1px);
 }
 .draft-chip.draft-chip-colour:not(:disabled) {
   color: #fff;
@@ -364,4 +370,17 @@ button:disabled {
 }
 .gameover ul {
   margin: 4px 0;
+}
+
+/* --- accessibility --- */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
