@@ -527,7 +527,7 @@ function CentralArea({
       <DraftableTile
         key={key}
         tile={t}
-        size={28}
+        size={56}
         dimmed={!matchesPreview(t)}
         allTiles={allTiles}
         draftable={draftable}
@@ -535,7 +535,7 @@ function CentralArea({
         onPreview={setPreview}
       />
     ) : (
-      <TileFace key={key} tile={t} size={28} />
+      <TileFace key={key} tile={t} size={56} />
     );
 
   return (
@@ -626,7 +626,6 @@ function PlayerPanel({
                     className={`${cls} coin`}
                     disabled={!active}
                     onClick={() => onTileItem(i)}
-                    title="coin (wildcard payment)"
                   >
                     🪙
                   </button>
@@ -634,7 +633,7 @@ function PlayerPanel({
               }
               return (
                 <button key={i} className={cls} disabled={!active} onClick={() => onTileItem(i)}>
-                  <TileFace tile={item.tile} size={30} />
+                  <TileFace tile={item.tile} size={60} />
                 </button>
               );
             })}
@@ -650,7 +649,7 @@ function PlayerPanel({
               const cls = `item expansion${isPlaced ? ' placed' : ''}${isPay ? ' pay' : ''}`;
               return (
                 <button key={i} className={cls} disabled={!active} onClick={() => onExpansionItem(i)}>
-                  {s.identity ? <TileFace tile={s.identity} size={30} /> : <em>blank</em>}
+                  {s.identity ? <TileFace tile={s.identity} size={60} /> : <em>blank</em>}
                 </button>
               );
             })}
@@ -695,7 +694,6 @@ function Garden({
           style={{ gridRow: row, gridColumn: col }}
           disabled={!isLegalTarget}
           onClick={() => isLegalTarget && onCell(slot as SlotId, dir as Direction)}
-          title={expansion ? (tile ? undefined : `slot ${slot}, dir ${dir}`) : `empty slot ${slot}`}
         >
           {tile ? <TileFace tile={tile} size={30} /> : empty ? '·' : ''}
         </button>,

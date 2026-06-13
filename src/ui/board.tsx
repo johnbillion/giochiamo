@@ -75,7 +75,6 @@ export function TileFace({ tile, size = 34 }: { tile: Tile; size?: number }) {
   return (
     <span
       className="tile-face"
-      title={tileLabel(tile)}
       style={{
         background: COLOUR_HEX[tile.colour],
         width: size,
