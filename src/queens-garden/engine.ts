@@ -1,8 +1,8 @@
 // Azul: Queen's Garden — engine (VERTICAL SLICE).
 //
 // Proves the round/turn skeleton end-to-end: 4 rounds, a pass-driven turn loop, the
-// first-passer penalty + next-round lead, and game-over. Same architecture as the TTT
-// engine: pure functions, a single `illegalReason` legality source, derived status.
+// first-passer penalty + next-round lead, and game-over. Pure functions, a single
+// `illegalReason` legality source, derived status.
 
 import {
   ActionType,
@@ -101,7 +101,7 @@ export function status(state: State): Phase {
   return state.round > ROUND_COUNT ? Phase.GameOver : Phase.Playing;
 }
 
-// The single source of legality truth (same pattern as the TTT engine).
+// The single source of legality truth.
 export function illegalReason(state: State, action: Action): string | null {
   if (status(state) !== Phase.Playing) {
     return 'the game is over';

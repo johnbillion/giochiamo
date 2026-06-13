@@ -10,7 +10,7 @@ Use what I'd call the Resume Test: if I texted you nothing but this data, could 
 
 ## 3. For each thing in that snapshot, ask: could I derive this instead of storing it?
 
-This is the sharpest modeling question there is. Anything you store that you could've computed becomes a second source of truth — and two sources of truth can disagree, which is exactly where bugs breed. In TTT there are two juicy candidates worth sitting with: whose turn is it, and has someone won. For each, ask "can I compute this from the board alone?" There's a genuine judgment call here — don't let me make it for you.
+This is the sharpest modeling question there is. Anything you store that you could've computed becomes a second source of truth — and two sources of truth can disagree, which is exactly where bugs breed. Two candidates worth sitting with in any turn-based game: whose turn is it, and has someone won. For each, ask "can I compute this from the board alone?" There's a genuine judgment call here — don't let me make it for you.
 
 ## 4. What are the actions, and for each: when is it legal, and what does it change?
 

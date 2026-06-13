@@ -1,7 +1,7 @@
 # Azul: Queen's Garden — Engine Model
 
 > **Role:** the structured model *derived* from `rules.md`, and the thing we codify
-> the engine from. Organized by the same five questions we used for Tic Tac Toe,
+> the engine from. Organized by the same five questions from `MODELLING.md`,
 > scaled up. Resolvers stay stubbed until Pass 3.
 
 **Target player count (first build):** _(TBD — pick one to cut branching; 2P suggested)_
@@ -132,4 +132,4 @@ gets an entry — these are the future-bugs we're heading off.
   choose the axis (a clicked tile's colour *or* its symbol), then resolve each duplicated combo
   one click at a time. Each step offers only a handful of options, so the explosion never
   materialises. (It's a tiny FSM of its own — and the same "validate one, don't enumerate all"
-  rule as the TTT engine.)
+  rule the engine uses everywhere.)
