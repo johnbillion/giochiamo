@@ -1,7 +1,5 @@
+import { Game } from './ui/Game';
+
 export function App() {
-  return (
-    <main>
-      <h1>Giochiamo</h1>
-    </main>
-  );
+  return <Game />;
 }

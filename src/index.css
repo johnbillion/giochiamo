@@ -1,6 +1,7 @@
 :root {
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
+  color: #1f2937;
 }
 
 * {
@@ -10,10 +11,328 @@
 body {
   margin: 0;
   min-height: 100vh;
-  display: grid;
-  place-items: center;
+  background: #f1f5f9;
 }
 
-main {
-  text-align: center;
+button {
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+
+.game {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* --- top bar --- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.topbar h1 {
+  font-size: 1.4rem;
+  margin: 0;
+  flex: 1;
+}
+.topbar .status {
+  font-size: 1.05rem;
+}
+
+/* --- shared --- */
+.hint {
+  color: #64748b;
+  font-size: 0.85rem;
+  margin: 4px 0;
+}
+.note {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+}
+
+/* coloured tile face with a symbol glyph */
+.tile-face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* --- central area --- */
+.central {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 12px 0;
+}
+.central h2,
+.central h3 {
+  margin: 6px 0;
+}
+.displays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+.display {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.display-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+.tiles {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-height: 30px;
+}
+.pile {
+  align-self: center;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.draft {
+  margin-top: 8px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+}
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+.chips-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  width: 56px;
+}
+.draft-chip {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 3px 12px;
+  background: #fff;
+  text-transform: capitalize;
+  color: #fff;
+}
+.draft-chip:disabled {
+  background: #f1f5f9 !important;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+
+/* --- action bar --- */
+.actionbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin: 12px 0;
+}
+.actionbar .placing {
+  flex: 1;
+}
+.pass {
+  margin-left: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 16px;
+  background: #fff;
+}
+
+/* --- players --- */
+.players {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.player {
+  flex: 1 1 360px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  opacity: 0.75;
+}
+.player.active {
+  opacity: 1;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px #c7d2fe;
+}
+.player h2 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.turn-badge {
+  font-size: 0.7rem;
+  background: #6366f1;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.passed-badge {
+  font-size: 0.7rem;
+  background: #94a3b8;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.score {
+  font-size: 0.85rem;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+/* --- garden grid --- */
+.garden {
+  display: grid;
+  justify-content: center;
+  gap: 2px;
+  margin: 8px auto;
+  width: max-content;
+}
+.cell {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: #cbd5e1;
+}
+.cell.no-section {
+  background: #f8fafc;
+  box-shadow: inset 0 0 0 1px #f1f5f9;
+}
+.cell.empty-space {
+  background: #eef2ff;
+  box-shadow: inset 0 0 0 1px #e0e7ff;
+}
+.cell.legal {
+  box-shadow: inset 0 0 0 2px #22c55e;
+  background: #dcfce7;
+  cursor: pointer;
+}
+
+/* --- storage --- */
+.storage {
+  margin-top: 8px;
+}
+.storage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  min-height: 36px;
+}
+.storage-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  width: 64px;
+}
+.items {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.item {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 2px;
+  border-radius: 6px;
+  display: inline-flex;
+}
+.item:disabled {
+  opacity: 0.85;
+}
+.item.coin {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+.item.placed {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px #c7d2fe;
+}
+.item.pay {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px #fde68a;
+}
+
+/* --- load-state dialog (native <dialog>) --- */
+.load-dialog {
+  border: none;
+  border-radius: 10px;
+  padding: 16px 20px;
+  width: min(640px, 100%);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  color: inherit;
+}
+.load-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+.load-dialog h2 {
+  margin: 0 0 4px;
+}
+.load-textarea {
+  width: 100%;
+  height: 280px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px;
+  resize: vertical;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.modal-actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 16px;
+  background: #fff;
+}
+
+/* --- game over --- */
+.gameover {
+  background: #fff;
+  border: 2px solid #6366f1;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 12px 0;
+}
+.gameover ul {
+  margin: 4px 0;
 }
