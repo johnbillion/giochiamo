@@ -119,7 +119,7 @@ export function draftIllegalReason(state: State, action: DraftAction): string | 
       return 'a chosen source does not hold that tile';
     }
   }
-  if (combos.length > STORAGE_TILE_LIMIT - player.storage.tiles.length) {
+  if (combos.length > STORAGE_TILE_LIMIT - player.storage.tiles.length - player.storage.coins) {
     return 'not enough tile storage for that draft';
   }
   if (sections.length > STORAGE_SECTION_LIMIT - player.storage.sections.length) {
@@ -191,6 +191,7 @@ export function resolveDraft(state: State, action: DraftAction): State {
       ? {
           ...p,
           storage: {
+            ...p.storage,
             tiles: [...p.storage.tiles, ...takenTiles],
             sections: [...p.storage.sections, ...takenSections],
           },

@@ -39,7 +39,7 @@ fields that can't be derived (the chess-castling lesson).
 | Supply / pools | **Tile bag** (remaining of 108) + **discard pile** + **section pool** (remaining of ~36) + **seed** | bag-empty → shuffle discard back in (seed-driven, must be logged); batch draws & section picks seed-driven |
 | Central area (per round) | **Pile** of this round's n sections (n=5/6/7); the **top** section holds 4 tiles; **split-off sections** each hold their leftover tiles (still draftable). Draft source = **all tiles in the central area**. A section is **takeable once emptied** (derived: tiles == 0). | top splits when <4 → next revealed w/ 4 fresh; leftovers discarded at round end |
 | Scoring wheel | _(current position)_ | changes per round |
-| Per player | **Play area** = 7 section slots (1 centre + 6 edge); centre starts with the **blank starter section** (6 free spaces, no identity), edges start empty. Each placed **non-centre section** carries a (colour, symbol) **identity tile** in 1 slot, leaving **5 free**. **Storage** (≤ **12 tiles**, **2 sections**) of unplaced components. **Score**. **Passed-this-round** flag. | section identity is game-relevant (scoring); ≤ 6 + 6×5 = **36** placeable spaces; passed-flag stored |
+| Per player | **Play area** = 7 section slots (1 centre + 6 edge); centre starts with the **blank starter section** (6 free spaces, no identity), edges start empty. Each placed **non-centre section** carries a (colour, symbol) **identity tile** in 1 slot, leaving **5 free**. **Storage**: a tile area (≤ **12**, holding **tiles + coins**; starts with **3 coins**) + room for **2 sections**. **Score**. **Passed-this-round** flag. | section identity is game-relevant (scoring); ≤ 6 + 6×5 = **36** placeable spaces; passed-flag stored |
 | Bookkeeping | round # (1–4), whose turn, **first-passer this round** (∅ until someone passes), phase | first-passer is history-dependent → stored; sets the −1 penalty and next round's first player |
 
 ## Q3 — Derive vs store
@@ -114,7 +114,9 @@ gets an entry — these are the future-bugs we're heading off.
     already empty before the draft are taken with it;
     (b) a **section-only** draft (no matching tiles, just a matching emptied section) is allowed;
     (c) you must take **all** distinct matching combos — no partial selection.
-19. **Coins:** A user earns coins during play that go into their tile storage area and can be used as part payment. Need to define how coins work.
+19. **Coins** — **PARTIALLY RESOLVED:** coins live in the **tile storage area** and **count
+    toward its 12-slot cap**; each player **starts with 3** (modelled as `storage.coins: number`).
+    Earn/spend rules deferred. *(Decision to confirm: coins occupy tile-storage capacity.)*
 20. **Payment:** A user must pay to place tiles and sections from their storage into their play area. Need to define how payment works.
 
 ## Design notes

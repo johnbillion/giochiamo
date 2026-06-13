@@ -40,12 +40,14 @@ export type Supply = {
   readonly sections: readonly Section[]; // remaining undealt sections
 };
 
-export const STORAGE_TILE_LIMIT = 12;
+export const STORAGE_TILE_LIMIT = 12; // the tile area holds tiles AND coins, up to this total
 export const STORAGE_SECTION_LIMIT = 2;
+export const STARTING_COINS = 3;
 
 export type PlayerStorage = {
-  readonly tiles: readonly Tile[]; // ≤ STORAGE_TILE_LIMIT
+  readonly tiles: readonly Tile[];
   readonly sections: readonly Section[]; // ≤ STORAGE_SECTION_LIMIT
+  readonly coins: number; // coins live in the tile area; tiles.length + coins ≤ STORAGE_TILE_LIMIT
 };
 
 export type PlayerId = number; // 0-based index into State.players

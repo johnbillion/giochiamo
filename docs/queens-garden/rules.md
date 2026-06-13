@@ -26,8 +26,11 @@ _(Pass 1 — a few sentences: theme, number of rounds, how you win.)_
     filling **one** of its 6 spaces (leaving 5 free). _Exception:_ the **central starter
     section** is blank — all 6 spaces free, no identity tile. (A section also has a centre symbol,
     but that is **purely decorative** — not modelled.)
-  - **Storage area** — holds a player's taken-but-unplaced components, capped at **12 tiles
-    and 2 garden sections**.
+  - **Storage area** — a player's taken-but-unplaced components: a **tile area** capped at **12**
+    (holding **tiles and coins** together) and room for **2 garden sections**.
+- **Coins** — each player starts with **3 coins**, kept in the tile area (counting toward its
+  12-slot cap). They are earned and spent through play and help pay placement costs.
+  _(earn/spend rules TBD)_
 - **Garden-section supply** — a finite pool of **~36** sections; each game uses a random
   subset sized by player count. _(exact count & per-count selection TBD)_
 - _(Scoring wheel, tokens, central drafting area — TBD in later chunks.)_

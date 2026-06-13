@@ -35,7 +35,7 @@ export function render(state: State): string {
     const turn = phase === Phase.Playing && i === state.currentPlayer ? '>' : ' ';
     const passed = p.passed ? ' [passed]' : '';
     lines.push(
-      `${turn} P${i}  score ${p.score}  storage ${p.storage.tiles.length}t/${p.storage.sections.length}s${passed}`,
+      `${turn} P${i}  score ${p.score}  storage ${p.storage.tiles.length}t/${p.storage.sections.length}s/${p.storage.coins}c${passed}`,
     );
   });
 

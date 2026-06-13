@@ -9,6 +9,7 @@ import {
   COLOURS,
   Phase,
   ROUND_COUNT,
+  STARTING_COINS,
   SYMBOLS,
   TILE_COPIES,
   type Action,
@@ -79,7 +80,7 @@ export function createInitialState(
   const players: PlayerState[] = Array.from({ length: playerCount }, () => ({
     passed: false,
     score: 0,
-    storage: { tiles: [], sections: [] },
+    storage: { tiles: [], sections: [], coins: STARTING_COINS },
   }));
 
   return {

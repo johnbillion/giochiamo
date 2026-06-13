@@ -16,7 +16,11 @@ import {
 } from './types';
 
 const tile = (colour: Colour, symbol: Symbol): Tile => ({ colour, symbol });
-const emptyPlayer = (): PlayerState => ({ passed: false, score: 0, storage: { tiles: [], sections: [] } });
+const emptyPlayer = (): PlayerState => ({
+  passed: false,
+  score: 0,
+  storage: { tiles: [], sections: [], coins: 0 },
+});
 
 function makeState(central: CentralArea, opts: { bag?: Tile[]; players?: PlayerState[] } = {}): State {
   return {
@@ -129,7 +133,11 @@ describe('draft — legality', () => {
     const nearlyFull: PlayerState = {
       passed: false,
       score: 0,
-      storage: { tiles: Array.from({ length: STORAGE_TILE_LIMIT - 1 }, () => tile('blue', 'bird')), sections: [] },
+      storage: {
+        tiles: Array.from({ length: STORAGE_TILE_LIMIT - 1 }, () => tile('blue', 'bird')),
+        sections: [],
+        coins: 0,
+      },
     };
     const s0 = makeState(
       {
@@ -146,6 +154,28 @@ describe('draft — legality', () => {
     const draft = buildDraft(s0, { kind: 'colour', colour: 'red' }); // wants 2 tiles, 1 space free
     expect(isLegal(s0, draft)).toBe(false);
     expect(() => applyAction(s0, draft)).toThrow();
+  });
+
+  it('counts coins against tile storage', () => {
+    // 10 tiles + 1 coin = 11 of 12 → only 1 free, so a 2-tile red draft is illegal.
+    const cramped: PlayerState = {
+      passed: false,
+      score: 0,
+      storage: { tiles: Array.from({ length: 10 }, () => tile('blue', 'bird')), sections: [], coins: 1 },
+    };
+    const s0 = makeState(
+      {
+        top: {
+          section: { identity: tile('green', 'acorn') },
+          tiles: [tile('red', 'bird'), tile('red', 'flower'), tile('green', 'leaf'), tile('green', 'bird')],
+        },
+        open: [],
+        pile: [],
+      },
+      { players: [cramped, emptyPlayer()] },
+    );
+
+    expect(isLegal(s0, buildDraft(s0, { kind: 'colour', colour: 'red' }))).toBe(false);
   });
 
   it('is illegal to draft an attribute nothing matches', () => {
