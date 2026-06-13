@@ -109,7 +109,9 @@ export function render(state: State): string {
   state.central.open.forEach((d, i) => {
     const body = d.tiles.some(Boolean)
       ? d.tiles.map(slotStr).join(', ')
-      : `(expansion ${d.expansion.identity ? tileStr(d.expansion.identity) : 'starter'})`;
+      : d.expansion === null
+        ? '(spent)'
+        : `(expansion ${d.expansion.identity ? tileStr(d.expansion.identity) : 'starter'})`;
     lines.push(`  open[${i}]: ${body}`);
   });
   lines.push(`  pile: ${state.central.pile.length} face-down`);

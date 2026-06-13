@@ -52,7 +52,7 @@ describe('initial deal', () => {
 
   it('every dealt expansion identity is a real colour+symbol combo', () => {
     const s = createInitialState(4, 7);
-    const all = [...(s.central.top ? [s.central.top.expansion] : []), ...s.central.pile, ...s.supply.expansions];
+    const all = [...(s.central.top ? [s.central.top.expansion!] : []), ...s.central.pile, ...s.supply.expansions];
     expect(all).toHaveLength(36);
     for (const expansion of all) {
       expect(expansion.identity).not.toBeNull();

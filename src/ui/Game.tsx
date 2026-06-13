@@ -590,8 +590,8 @@ function CentralArea({
   if (central.top) for (const t of central.top.tiles) if (t) allTiles.push(t);
   for (const d of central.open) for (const t of d.tiles) if (t) allTiles.push(t);
   const takeableExpansions: Tile[] = central.open
-    .filter((d) => !d.tiles.some(Boolean) && d.expansion.identity)
-    .map((d) => d.expansion.identity!);
+    .filter((d) => !d.tiles.some(Boolean) && d.expansion?.identity)
+    .map((d) => d.expansion!.identity!);
 
   const countFor = (attr: Attribute): number => {
     const match = (t: Tile) =>
@@ -622,7 +622,10 @@ function CentralArea({
     );
 
   // A takeable expansion is drafted the same way as a tile (by its identity's colour or symbol).
-  const renderExpansion = (expansion: Expansion, key: number) => {
+  // A spent pile (null expansion — its expansion already taken) renders empty, leaving only the
+  // rosette outline so the pile keeps its slot.
+  const renderExpansion = (expansion: Expansion | null, key: number) => {
+    if (expansion === null) return <span key={key} className="pile-spent" aria-label="empty pile" />;
     const face = <ExpansionFace expansion={expansion} size={20} />;
     const id = expansion.identity;
     if (!canDraft || !id) return <span key={key}>{face}</span>;

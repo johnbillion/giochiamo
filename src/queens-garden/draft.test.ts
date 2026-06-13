@@ -70,7 +70,7 @@ describe('draft — taking tiles', () => {
     expect(s1.central.open).toHaveLength(1); // old top split off…
     // …carrying its leftovers in their original slots, with holes where the reds were drafted
     expect(s1.central.open[0]!.tiles).toEqual([null, null, tile('blue', 'bird'), tile('green', 'herb')]);
-    expect(s1.central.top!.expansion.identity).toEqual(tile('orange', 'butterflies')); // next revealed
+    expect(s1.central.top!.expansion!.identity).toEqual(tile('orange', 'butterflies')); // next revealed
     expect(s1.central.top!.tiles).toHaveLength(4); // with a fresh batch
     expect(totalTiles(s1)).toBe(totalTiles(s0)); // conserved
   });
@@ -134,7 +134,8 @@ describe('draft — taking expansions', () => {
 
     expect(s1.players[0]!.storage.expansions).toEqual([{ identity: tile('red', 'flower') }]);
     expect(storageTiles(s1.players[0]!.storage)).toHaveLength(0);
-    expect(s1.central.open).toHaveLength(0); // the expansion was taken
+    // The pile stays in place as a spent placeholder (null expansion) so surviving piles don't shift.
+    expect(s1.central.open).toEqual([{ expansion: null, tiles: [] }]);
   });
 });
 

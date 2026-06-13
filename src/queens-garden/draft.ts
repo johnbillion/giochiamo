@@ -67,11 +67,12 @@ function matchingCombos(central: CentralArea, attr: Attribute): Tile[] {
   return combos;
 }
 
-// Emptied (takeable) open expansions matching the attribute.
+// Emptied (takeable) open expansions matching the attribute. A spent pile (expansion already
+// taken) has a null expansion and is skipped.
 function matchingExpansions(central: CentralArea, attr: Attribute): Expansion[] {
   return central.open
-    .filter((d) => isEmptied(d) && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr))
-    .map((d) => d.expansion);
+    .filter((d) => isEmptied(d) && d.expansion !== null && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr))
+    .map((d) => d.expansion!);
 }
 
 function displayAt(central: CentralArea, source: DraftSource): Display | null {
@@ -146,17 +147,18 @@ export function resolveDraft(state: State, action: DraftAction): State {
   const takenExpansions: Expansion[] = [];
   const takenIndices = new Set<number>();
   source.open.forEach((d, index) => {
-    if (isEmptied(d) && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr)) {
+    if (isEmptied(d) && d.expansion !== null && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr)) {
       takenExpansions.push(d.expansion);
       takenIndices.add(index);
     }
   });
 
-  // 3. Rebuild the open displays (drop taken expansions, keep leftover tiles).
-  const open: Display[] = [];
-  source.open.forEach((d, index) => {
-    if (!takenIndices.has(index)) open.push({ expansion: d.expansion, tiles: openTiles[index]! });
-  });
+  // 3. Rebuild the open displays, keeping leftover tiles. A pile whose expansion was just taken
+  // stays in place as a spent placeholder (null expansion) so the surviving piles don't shift.
+  const open: Display[] = source.open.map((d, index) => ({
+    expansion: takenIndices.has(index) ? null : d.expansion,
+    tiles: openTiles[index]!,
+  }));
 
   // 4. Split the top if it dropped below 4, revealing the next expansion with 4 fresh tiles.
   let top: Display | null = source.top && topTiles ? { expansion: source.top.expansion, tiles: topTiles } : null;

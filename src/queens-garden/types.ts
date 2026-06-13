@@ -30,8 +30,9 @@ export type Expansion = { readonly identity: Tile | null };
 // A revealed expansion in the central area, plus the draftable tiles sitting on it. The tiles
 // array is positional: a fresh display holds 4 tiles, and a drafted tile leaves a `null` hole
 // behind so the survivors keep their slots. An expansion is emptied (takeable) once every slot
-// is null.
-export type Display = { readonly expansion: Expansion; readonly tiles: readonly (Tile | null)[] };
+// is null. Once that expansion is itself taken, `expansion` becomes null too — a spent pile that
+// stays in place (so the surviving piles don't shift) until the round is re-dealt.
+export type Display = { readonly expansion: Expansion | null; readonly tiles: readonly (Tile | null)[] };
 
 export type CentralArea = {
   readonly top: Display | null; // current top of the pile (fresh = 4 tiles); null once exhausted
