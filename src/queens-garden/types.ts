@@ -86,7 +86,7 @@ export type PlayerState = {
   readonly passed: boolean; // has this player passed this round?
   readonly score: number;
   readonly storage: PlayerStorage;
-  // `garden: Garden` is wired in with the placement slice (nothing fills it until then)
+  readonly garden: Garden;
 };
 
 export type State = {
@@ -103,7 +103,7 @@ export const ActionType = {
   Draft: 'draft',
   Reorder: 'reorder',
   PlaceSection: 'place-section',
-  PlaceTiles: 'place-tiles',
+  PlaceTile: 'place-tile',
   Pass: 'pass',
 } as const;
 export type ActionType = (typeof ActionType)[keyof typeof ActionType];
@@ -132,14 +132,37 @@ export type ReorderAction =
   | { readonly type: typeof ActionType.Reorder; readonly area: 'tiles'; readonly order: readonly StorageItem[] }
   | { readonly type: typeof ActionType.Reorder; readonly area: 'sections'; readonly order: readonly Section[] };
 
-// Placement effects are still stubbed (the placement rules come next).
-export type PlaceSectionAction = { readonly type: typeof ActionType.PlaceSection };
-export type PlaceTilesAction = { readonly type: typeof ActionType.PlaceTiles };
+// Paying to place: the placed item itself counts as 1 toward its cost; the rest is matching
+// items (sharing the placed tile's colour OR symbol) plus coins (wildcards).
+export type Payment = {
+  readonly tiles: readonly Tile[];
+  readonly sections: readonly Section[];
+  readonly coins: number;
+};
+
+// Place a section into an empty garden slot, choosing which direction its identity faces.
+export type PlaceSectionAction = {
+  readonly type: typeof ActionType.PlaceSection;
+  readonly section: Section;
+  readonly slot: SlotId;
+  readonly identityDir: Direction;
+  readonly payment: Payment;
+};
+
+// Place a stored tile onto an empty space of a placed section.
+export type PlaceTileAction = {
+  readonly type: typeof ActionType.PlaceTile;
+  readonly tile: Tile;
+  readonly slot: SlotId;
+  readonly dir: Direction;
+  readonly payment: Payment;
+};
+
 export type PassAction = { readonly type: typeof ActionType.Pass };
 
 export type Action =
   | DraftAction
   | ReorderAction
   | PlaceSectionAction
-  | PlaceTilesAction
+  | PlaceTileAction
   | PassAction;

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { adjacentPositions, createStarterGarden, neighbourSlot, tileAt, type TilePosition } from './garden';
+import {
+  adjacentPositions,
+  createStarterGarden,
+  neighbourSlot,
+  tileAt,
+  type TilePosition,
+} from './garden';
 import type { Direction, PlacedSection, SlotId, Tile } from './types';
 
 const DIRECTIONS: Direction[] = [0, 1, 2, 3, 4, 5];
@@ -75,3 +81,4 @@ describe('sections & the starter', () => {
     expect(g.slice(1).every((slot) => slot === null)).toBe(true);
   });
 });
+

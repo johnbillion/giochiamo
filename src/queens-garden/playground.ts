@@ -19,6 +19,10 @@ import {
   type Action,
   type Attribute,
   type Colour,
+  type Direction,
+  type Payment,
+  type Section,
+  type SlotId,
   type State,
   type Symbol,
   type Tile,
@@ -26,6 +30,7 @@ import {
 
 const tileStr = (t: Tile): string => `${t.colour}/${t.symbol}`;
 const attrStr = (a: Attribute): string => (a.kind === 'colour' ? a.colour : a.symbol);
+const NO_PAYMENT: Payment = { tiles: [], sections: [], coins: 0 };
 
 export function render(state: State): string {
   const phase = status(state);
@@ -74,8 +79,8 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
         '  g.draftColour(c)   take every draftable tile/section of colour c',
         '  g.draftSymbol(s)   take every draftable tile/section of symbol s',
         '  g.draft(attr)      draft by { kind: "colour" | "symbol", ... }',
-        '  g.placeSection()   (stubbed) place a section, ends your turn',
-        '  g.placeTiles()     (stubbed) place tiles, ends your turn',
+        '  g.placeSection(section, slot, dir, payment?)  place a section (identity faces dir)',
+        '  g.placeTile(tile, slot, dir, payment?)        place a tile on a section space',
         '  g.pass()           pass for the rest of the round',
         '  g.move(from, to)   rearrange your tile storage (free, no turn cost)',
         '  g.moveSection(f,t) rearrange your section storage (free)',
@@ -104,8 +109,10 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
       if (item) order.splice(to, 0, item);
       return act({ type: ActionType.Reorder, area: 'sections', order });
     },
-    placeSection: (): State => act({ type: ActionType.PlaceSection }),
-    placeTiles: (): State => act({ type: ActionType.PlaceTiles }),
+    placeSection: (section: Section, slot: SlotId, identityDir: Direction, payment: Payment = NO_PAYMENT): State =>
+      act({ type: ActionType.PlaceSection, section, slot, identityDir, payment }),
+    placeTile: (tile: Tile, slot: SlotId, dir: Direction, payment: Payment = NO_PAYMENT): State =>
+      act({ type: ActionType.PlaceTile, tile, slot, dir, payment }),
     pass: (): State => act({ type: ActionType.Pass }),
     actions: (): ActionType[] => availableActionTypes(state),
     draftable: (): Attribute[] => draftableAttributes(state),

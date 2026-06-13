@@ -11,6 +11,7 @@ import {
   Phase,
   ROUND_COUNT,
   STARTING_COINS,
+  storageTiles,
   SYMBOLS,
   TILE_COPIES,
   type Action,
@@ -27,6 +28,13 @@ import {
 import { makeRng, type Rng } from './rng';
 import { drawTiles } from './supply';
 import { draftableAttributes, draftIllegalReason, resolveDraft } from './draft';
+import { createStarterGarden } from './garden';
+import {
+  placeSectionIllegalReason,
+  placeTileIllegalReason,
+  resolvePlaceSection,
+  resolvePlaceTile,
+} from './placement';
 
 const PLAYER_COUNT_MIN = 2;
 const PLAYER_COUNT_MAX = 4;
@@ -99,6 +107,7 @@ export function createInitialState(
     passed: false,
     score: 0,
     storage: { tileArea: Array.from({ length: STARTING_COINS }, () => coinItem), sections: [] },
+    garden: createStarterGarden(),
   }));
 
   return {
@@ -128,9 +137,9 @@ export function illegalReason(state: State, action: Action): string | null {
     case ActionType.Reorder:
       return reorderIllegalReason(state, action);
     case ActionType.PlaceSection:
-    case ActionType.PlaceTiles:
-      // Placement preconditions arrive with the placement rules.
-      return null;
+      return placeSectionIllegalReason(state, action);
+    case ActionType.PlaceTile:
+      return placeTileIllegalReason(state, action);
     case ActionType.Pass:
       // The current player is always active (passed players are skipped), so pass is legal.
       return null;
@@ -146,15 +155,13 @@ export function isLegal(state: State, action: Action): boolean {
 // to construct a specific draft. The parameterless actions are simply listed.
 export function availableActionTypes(state: State): ActionType[] {
   if (status(state) !== Phase.Playing) return [];
-  const kinds: ActionType[] = [
-    ActionType.Reorder,
-    // TODO: PlaceSection/PlaceTiles are stub-legal until the placement rules add real
-    // preconditions; this list must then reflect them (as Draft does via draftableAttributes).
-    ActionType.PlaceSection,
-    ActionType.PlaceTiles,
-    ActionType.Pass,
-  ];
+  const player = state.players[state.currentPlayer]!;
+  const kinds: ActionType[] = [ActionType.Reorder, ActionType.Pass];
   if (draftableAttributes(state).length > 0) kinds.unshift(ActionType.Draft);
+  // Necessary conditions only — you can only place what you hold. Whether a legal target +
+  // affordable payment exists is left to illegalReason on a concrete action.
+  if (player.storage.sections.length > 0) kinds.push(ActionType.PlaceSection);
+  if (storageTiles(player.storage).length > 0) kinds.push(ActionType.PlaceTile);
   return kinds;
 }
 
@@ -173,9 +180,9 @@ export function applyAction(state: State, action: Action): State {
     case ActionType.Pass:
       return resolvePass(state);
     case ActionType.PlaceSection:
-    case ActionType.PlaceTiles:
-      // Placement effects arrive with the placement rules — for now the turn just passes.
-      return advanceTurn(state);
+      return advanceTurn(resolvePlaceSection(state, action));
+    case ActionType.PlaceTile:
+      return advanceTurn(resolvePlaceTile(state, action));
   }
 }
 

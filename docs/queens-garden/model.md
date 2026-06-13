@@ -157,14 +157,11 @@ gets an entry — these are the future-bugs we're heading off.
     **coins** (each a wildcard worth 1). All payment items + coins are discarded. *Consequence:*
     the **SYMBOLS order is now game-relevant** (it sets cost) — update the "arbitrary names" note
     when codifying, via a `symbolCost(symbol) = index + 1` helper.
-23. **Placement — still open:**
-    (a) must all non-coin payment items match the placed item on the *same single* axis? (assumed
-    yes, per drafting); (b) can a payment item be identical to the placed item? (assumed no);
-    (c) discard destinations — payment **tiles → discard pile** (reshuffleable), **sections →
-    removed from play**, **coins → ?** (coin bank TBD); (d) can a place action place **one** item
-    or several per turn? (assumed one); (e) the **"where"** — section-slot adjacency (#8), tile
-    spaces & orientation (#3), cross-section adjacency (#5) — still needed before placement can be
-    codified.
+23. **Placement assumptions — now implemented (flag if any are wrong):** (a) non-coin payment
+    items all match the placed item on a **single axis** ✓; (b) no payment item may equal the
+    placed item ✓; (c) discard destinations — payment **tiles → discard pile**, **sections & coins
+    → out of play** (no coin bank modelled) ✓; (d) **one** item placed per place action ✓; (e) the
+    "where" is resolved (#25/#26/#27). All codified in `placement.ts`.
 
 24. **Garden topology + the rotation question (feeds placement).** The 7 section-slots form a
     hex flower: the **centre is adjacent to all 6** ring slots; each **ring slot** is adjacent to
@@ -195,17 +192,22 @@ gets an entry — these are the future-bugs we're heading off.
     section placement is just the case where only the cross-edge neighbour can be occupied. One
     helper covers both: `adjacentPositions` + `tileAt` + a `shareExactlyOne` check.
 
-27. **Runs (placement constraint) — rule captured, topology open.** A *run* = a line of tiles
-    (incl. a section's identity). Placing must not create a run with >6 of one colour, >6 of one
-    symbol, or any identical tiles. *Likely simplification:* with only 6 symbols, **no-identical**
-    (rule 3) already caps a colour at 6 and a symbol at 6, so the binding check is just
-    "no identical tiles in any run through the placed position" — **confirm**. *Open — the line
-    topology:* need the precise set of lines. Known types: each section's **6-slot ring** (loop);
-    **cross-boundary** straight lines; the **6-slot loop** where two adjacent ring sections + the
-    centre meet. Proposed representation: a constant `LINES: TilePosition[][]` (with a circular
-    flag), defined once and unit-tested — the runs-equivalent of the neighbour table. A *run* is
-    then the maximal contiguous stretch of occupied tiles along a line through the placed tile.
-    *(Confirm: are there straight lines beyond the two loop types, and how are they traced?)*
+27. **Runs — topology CORRECTED (supersedes the earlier fixed-lines model).** A *run* is a chain
+    of face-adjacent tiles **all sharing one attribute** — all one colour, or all one symbol —
+    following the adjacency graph **freely** (rounding rings, crossing section edges); it is **not**
+    an arc along a fixed set of lines. The placement constraint is a single rule: placing must not
+    **join two identical tiles** into a run — no colour-run or symbol-run *through the placed tile*
+    may contain two identical tiles. The "≤6 per run" bound is **emergent** (a mono-attribute run
+    with no repeat holds ≤6, since only 6 of the other axis exist), not a separate check — so rules
+    1–2 (≤6 colour/symbol) really do follow from rule 3, as suspected. Codified in `placement.ts`:
+    `monoRun(after, placed, pos, attr)` (a BFS over `adjacentPositions`, stepping only onto tiles
+    matching `placed`'s colour/symbol) + `joinsIdenticalTiles`; unit-tested incl. the corner-turning
+    join and the mixed-attribute arc that the old model got wrong.
+    **Earlier (now removed):** runs were modelled as contiguous arcs along 13 fixed lines (7 section
+    rings + 6 junction rings) via `LINES`/`runsThrough` in `garden.ts`. That model was wrong **both
+    ways** — it missed mono-attribute joins that bend off a single line, and rejected contiguous
+    arcs whose tiles don't actually share one attribute. The `LINES`/`runsThrough` machinery and its
+    tests were deleted; `adjacentPositions` (the traversal primitive) and `tileAtPosition` stay.
 
 28. **Board = hex cells; identity is just a tile (simplification) — RESOLVED.** The screenshot
     confirms tiles are hex **cells** (6 ringing each of the 7 holes) and a tile touches **one**
@@ -214,9 +216,16 @@ gets an entry — these are the future-bugs we're heading off.
     `identity`/`rotation`. The identity is a pre-placed tile; "rotation" is only the placement
     choice of which slot it lands on. So placement & scoring are **uniformly tile-level**, and
     `place section` = drop a blank frame + place the identity tile (same adjacency check as
-    `place tile`). *Still open — run line-tracing:* the degree-3 adjacency gives the section rings
-    + pairwise cross-edges, but tracing a **straight** 4–6-tile run across sections needs
-    line-continuation info (likely axial coords). For the runs slice.
+    `place tile`). *Run tracing:* runs are **mono-attribute chains over the adjacency graph**
+    (`monoRun` / `joinsIdenticalTiles` in `placement.ts`), **not** arcs of fixed rings — see #27.
+
+29. **Placement codified.** `place section` / `place tile` (`placement.ts`): target valid (empty
+    slot / empty space of a placed section) → shared adjacency rule (exactly-one attribute with
+    each face neighbour) → no run joins two identical tiles (`joinsIdenticalTiles`) → valid payment (cost =
+    symbol index, inclusive of the placed item; matching items + coin wildcards) → apply. `garden`
+    is now wired into `PlayerState`; `availableActionTypes` gates place actions on *holding* the
+    item (necessary, not sufficient — concrete legality is `illegalReason`). Tested: free & paid
+    placement, adjacency (match-one / mismatch), run duplicates, underpayment, section placement.
 
 ## Design notes
 

@@ -59,3 +59,8 @@ export function createStarterGarden(): Garden {
   const starter: PlacedSection = { tiles: Array.from({ length: 6 }, () => null) };
   return [starter, null, null, null, null, null, null];
 }
+
+export function tileAtPosition(garden: Garden, pos: TilePosition): Tile | null {
+  const section = garden[pos.slot];
+  return section ? tileAt(section, pos.dir) : null;
+}

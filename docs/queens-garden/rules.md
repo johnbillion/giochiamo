@@ -131,18 +131,24 @@ onto a section — obey one shared adjacency rule.
   shared edge.
 
 ### Runs
-A **run** is a set of tiles (including a section's fixed identity tile) that form a **line**.
-Lines can **cross section boundaries**, and some are **circular**: the **6 slots around a single
-section**, and the **6 slots around the point where two adjacent ring sections meet the centre**.
+A **run** is a chain of face-adjacent tiles (a section's fixed identity tile counts as a tile)
+that **all share one attribute** — **all the same colour**, or **all the same symbol**. A run
+follows the **adjacency graph freely**: it can round a section's ring and **cross section
+boundaries**, with no fixed shape — it is *not* confined to straight or circular lines.
 
-Placing a tile or a section must not break these run rules:
-1. **≤ 6 tiles of one colour** in a run.
-2. **≤ 6 tiles of one symbol** in a run.
-3. **No identical tiles** in a run.
+The placement rule is a single constraint: placing a tile or a section must not **join two
+identical tiles** into a run. After placing, no run (colour or symbol) passing **through the placed
+tile** may contain **two identical tiles** (same colour *and* symbol). Two identical tiles may sit
+within a few cells of each other, so long as **no single-attribute chain connects them**.
 
-_(Given only 6 symbols/colours, rules 1–2 appear to follow from rule 3 + no-duplicates — confirm.)_
-_(A run of 4–6 tiles can span up to three sections, given the board topology.)_
-_(The exact set of lines — the "runs topology" — still needs precise definition; see model.md.)_
+- _e.g._ red/acorn — red/bird — red/acorn is **illegal** (one red run, two red/acorns). But
+  red/acorn — red/bird — blue/bird — blue/acorn — red/acorn is **fine**: the chain switches its
+  shared attribute partway, so neither a colour-run nor a symbol-run links the two red/acorns.
+
+A run is at most **6 tiles** long, but that is a **consequence, not a separate rule**: a
+mono-colour run with no repeated tile holds at most 6 (only 6 symbols exist), and likewise a
+mono-symbol run. So the old "≤6 of one colour / ≤6 of one symbol" phrasings both fall out of the
+single "no run joins two identical tiles" rule.
 
 ## Round scoring
 _(Pass 3 — how scoring resolves at the end of a round, incl. the scoring wheel.)_

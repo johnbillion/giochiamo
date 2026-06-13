@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyAction, availableActionTypes, createInitialState, isLegal, status } from './engine';
+import { buildDraft, draftableAttributes } from './draft';
 import { ActionType, Phase, ROUND_COUNT, storageTiles, type Action, type State } from './types';
 
-const place: Action = { type: ActionType.PlaceSection };
 const pass: Action = { type: ActionType.Pass };
 
 function apply(state: State, ...actions: Action[]): State {
@@ -38,7 +38,8 @@ describe('setup', () => {
 
 describe('turn order', () => {
   it('a non-pass action passes the turn to the next player', () => {
-    const s = apply(createInitialState(2, 1, 0), place);
+    const s0 = createInitialState(2, 1, 0);
+    const s = apply(s0, buildDraft(s0, draftableAttributes(s0)[0]!));
     expect(s.currentPlayer).toBe(1);
     expect(s.round).toBe(1);
     expect(s.players.some((p) => p.passed)).toBe(false);
@@ -105,7 +106,12 @@ describe('legality', () => {
 
     const states: State[] = [createInitialState(2, 1, 0), createInitialState(4, 1, 2), over];
     for (const s of states) {
-      for (const action of [place, pass]) {
+      const reorder: Action = {
+        type: ActionType.Reorder,
+        area: 'tiles',
+        order: [...s.players[s.currentPlayer]!.storage.tileArea],
+      };
+      for (const action of [pass, reorder]) {
         let throws = false;
         try {
           applyAction(s, action);

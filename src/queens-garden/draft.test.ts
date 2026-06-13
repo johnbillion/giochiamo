@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { applyAction, isLegal } from './engine';
 import { buildDraft } from './draft';
+import { createStarterGarden } from './garden';
 import {
   ActionType,
   coinItem,
@@ -25,6 +26,7 @@ const emptyPlayer = (): PlayerState => ({
   passed: false,
   score: 0,
   storage: { tileArea: [], sections: [] },
+  garden: createStarterGarden(),
 });
 
 function makeState(central: CentralArea, opts: { bag?: Tile[]; players?: PlayerState[] } = {}): State {
@@ -142,6 +144,7 @@ describe('draft — legality', () => {
         tileArea: Array.from({ length: STORAGE_TILE_LIMIT - 1 }, () => tileItem(tile('blue', 'bird'))),
         sections: [],
       },
+      garden: createStarterGarden(),
     };
     const s0 = makeState(
       {
@@ -169,6 +172,7 @@ describe('draft — legality', () => {
         tileArea: [...Array.from({ length: 10 }, () => tileItem(tile('blue', 'bird'))), coinItem],
         sections: [],
       },
+      garden: createStarterGarden(),
     };
     const s0 = makeState(
       {
@@ -202,7 +206,7 @@ describe('draft — legality', () => {
 describe('reorder — rearranging storage', () => {
   it("permutes the current player's tile area without advancing the turn", () => {
     const items: StorageItem[] = [tileItem(tile('red', 'bird')), coinItem, tileItem(tile('blue', 'leaf'))];
-    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: items, sections: [] } };
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: items, sections: [] }, garden: createStarterGarden() };
     const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
 
     const order: StorageItem[] = [items[2]!, items[0]!, items[1]!];
@@ -215,7 +219,7 @@ describe('reorder — rearranging storage', () => {
   it('permutes the section storage too', () => {
     const a: Section = { identity: tile('red', 'bird') };
     const b: Section = { identity: tile('blue', 'leaf') };
-    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [], sections: [a, b] } };
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [], sections: [a, b] }, garden: createStarterGarden() };
     const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
 
     const s1 = applyAction(s0, { type: ActionType.Reorder, area: 'sections', order: [b, a] });
@@ -225,7 +229,7 @@ describe('reorder — rearranging storage', () => {
   });
 
   it('rejects an order that is not a permutation of the area', () => {
-    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [coinItem], sections: [] } };
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [coinItem], sections: [] }, garden: createStarterGarden() };
     const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
 
     const bogus: Action = { type: ActionType.Reorder, area: 'tiles', order: [tileItem(tile('red', 'bird'))] };
