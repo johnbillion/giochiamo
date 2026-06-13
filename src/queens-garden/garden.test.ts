@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   adjacentPositions,
   createStarterGarden,
+  JUNCTION_GAPS,
   neighbourSlot,
   tileAt,
   type TilePosition,
@@ -79,6 +80,32 @@ describe('sections & the starter', () => {
     const g = createStarterGarden();
     expect(g[0]).toEqual({ tiles: [null, null, null, null, null, null] });
     expect(g.slice(1).every((slot) => slot === null)).toBe(true);
+  });
+});
+
+describe('coin-scoring regions', () => {
+  it('has 6 junction gaps, each 6 petals across the centre + 2 ring sections', () => {
+    expect(JUNCTION_GAPS).toHaveLength(6);
+    for (const gap of JUNCTION_GAPS) {
+      expect(gap).toHaveLength(6);
+      const perSlot = new Map<SlotId, number>();
+      for (const p of gap) perSlot.set(p.slot, (perSlot.get(p.slot) ?? 0) + 1);
+      expect(perSlot.size).toBe(3); // centre + two ring sections
+      expect(perSlot.get(0)).toBe(2); // two centre petals
+      expect([...perSlot.values()].every((c) => c === 2)).toBe(true); // 2 from each section
+    }
+  });
+
+  it('every gap petal is adjacent to the next around its ring (a real 6-cycle)', () => {
+    for (const gap of JUNCTION_GAPS) {
+      // each petal shares an edge with at least two others in the gap (it's a ring)
+      for (const p of gap) {
+        const inGap = gap.filter(
+          (q) => adjacentPositions(p).some((a) => a.slot === q.slot && a.dir === q.dir),
+        );
+        expect(inGap.length).toBeGreaterThanOrEqual(2);
+      }
+    }
   });
 });
 

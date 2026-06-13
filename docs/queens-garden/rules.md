@@ -6,7 +6,8 @@
 > When this file is ambiguous, the ambiguity becomes a logged decision in `model.md`.
 
 **Source:** _(rulebook edition / URL — to be filled)_
-**Target player count for the first model:** _(TBD — see model.md)_
+**Target player count for the first model:** 2–4 (the engine is general; player count only sets
+how many sections are in play per round).
 
 ---
 
@@ -29,15 +30,16 @@ _(Pass 1 — a few sentences: theme, number of rounds, how you win.)_
   - **Storage area** — a player's taken-but-unplaced components: a **tile area** capped at **12**
     (holding **tiles and coins** together) and room for **2 garden sections**.
 - **Coins** — each player starts with **3 coins**, kept in the tile area (counting toward its
-  12-slot cap). They are earned and spent through play and help pay placement costs.
-  _(earn/spend rules TBD)_
-- **Garden-section supply** — a finite pool of **~36** sections; each game uses a random
-  subset sized by player count. _(exact count & per-count selection TBD)_
+  12-slot cap). Each coin is a **wildcard worth 1** toward a placement cost (**spending** — see
+  Placement & payment), and coins are **earned** by completing 6-tile regions on placement
+  (**earning** — see *Earning coins*).
+- **Garden-section supply** — a pool of exactly **36** sections (one per colour+symbol combo);
+  each round draws **n = player count + 3** at random (so **5 / 6 / 7** for **2 / 3 / 4**).
 - _(Scoring wheel, tokens, central drafting area — TBD in later chunks.)_
 
 ## Setup
 - Player count **2–4**. Rules vary little by count — it mainly changes the **number of garden
-  sections** in play. _(exact per-count numbers TBD)_
+  sections** in play (**n = player count + 3**: 5 / 6 / 7 for 2 / 3 / 4).
 - Each player starts with **no tiles and no sections**.
 - The play area starts **empty except the centre slot**, which holds **one empty garden
   section**. The 6 edge slots **cannot receive tiles until a garden section is placed there
@@ -45,7 +47,7 @@ _(Pass 1 — a few sentences: theme, number of rounds, how you win.)_
 - _(Scoring-wheel start position — TBD.)_
 
 ## Central area & tile flow
-- The **tile supply** (108 tiles, drawn at random) and **section supply** (~36 sections) sit in
+- The **tile supply** (108 tiles, drawn at random) and **section supply** (36 sections) sit in
   a shared **central area** used by all players; a **discard pile** collects spent tiles.
 - **Per round, n sections are in play:** n = **5 / 6 / 7** for **2 / 3 / 4** players, drawn at
   random from the remaining section pool at the start of each round and **stacked into a pile**.
@@ -83,6 +85,10 @@ On a turn, a player does one of:
 2. **Place a section** — place a stored garden section into an empty, playable play-area slot.
 3. **Place tiles on sections** — place stored tile(s) onto the free spaces of a placed section.
 4. **Pass** — stop taking turns this round (first to pass: −1 at scoring, leads next round).
+
+_(The engine also offers a free **reorder** action — rearranging your own storage — which is a
+modelling affordance with no gameplay effect and no turn cost; it isn't a rulebook action. See
+model.md #20.)_
 
 _Example:_ central area has 3 green tiles, 2 red tiles, and a red section. Choosing **red** takes
 both red tiles **and** the red section; **green** takes the 3 greens. A player with only 2 free
@@ -149,6 +155,28 @@ A run is at most **6 tiles** long, but that is a **consequence, not a separate r
 mono-colour run with no repeated tile holds at most 6 (only 6 symbols exist), and likewise a
 mono-symbol run. So the old "≤6 of one colour / ≤6 of one symbol" phrasings both fall out of the
 single "no run joins two identical tiles" rule.
+
+### Earning coins (completion bonuses)
+Coins are earned by **placing the tile that completes a 6-tile region** — the sixth tile that
+fills it. The bonus is granted the instant the completing tile lands. Three region types pay out:
+
+- **Central section filled** — all 6 spaces of the centre section → **1 coin**.
+- **An outer ring section filled** — all 6 spaces of one of the 6 ring sections → **3 coins**.
+- **A gap surrounded** — one of the **6 gaps** where two adjacent ring sections meet the centre,
+  ringed by 6 tiles (2 from the centre + 2 from each of the two ring sections) → **2 coins**.
+
+A **single placement can satisfy several of these at once, and the bonuses stack** — because the
+completing tile sits where regions overlap. _e.g._ a centre-section space is shared by the centre
+section and two gaps, so one tile can complete the centre section **and** both gaps: 1 + 2 + 2 =
+**5 coins**. (Only placing a **tile** can earn coins — a freshly placed section lays a single
+tile, never a sixth.)
+
+**Storage cap on earned coins.** Coins live in the tile area, capped at 12 (tiles and coins
+together). If a placement would earn more coins than there is room for, the player earns only **as
+many as fit** — the rest are **lost**. So every placement has a **maximum** reward (what its
+completed regions are worth) and an **actual** reward (what fits once the placed tile and payment
+have left the tile area). When the actual is less than the maximum, the player must be **warned
+before committing** that part of the reward will be forfeited.
 
 ## Round scoring
 _(Pass 3 — how scoring resolves at the end of a round, incl. the scoring wheel.)_

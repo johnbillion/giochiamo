@@ -3,8 +3,10 @@
 // tile` = place a tile on a placed section's empty space. Both run through the same checks.
 
 import {
+  coinItem,
   storageCoins,
   storageTiles,
+  STORAGE_TILE_LIMIT,
   SYMBOLS,
   type Direction,
   type Garden,
@@ -19,7 +21,7 @@ import {
   type Symbol,
   type Tile,
 } from './types';
-import { adjacentPositions, tileAt, tileAtPosition, type TilePosition } from './garden';
+import { adjacentPositions, JUNCTION_GAPS, tileAt, tileAtPosition, type TilePosition } from './garden';
 
 const tileKey = (t: Tile): string => `${t.colour}:${t.symbol}`;
 const posKey = (p: TilePosition): string => `${p.slot}:${p.dir}`;
@@ -194,7 +196,44 @@ function spend(
   return { tileArea, sections };
 }
 
+// --- coin earning (completion bonuses) ---
+
+const CENTRE_COIN = 1;
+const RING_COIN = 3;
+const GAP_COIN = 2;
+
+// Coins earned by completing 6-tile regions with a tile at `pos`, given the garden *after* the
+// placement. A region pays out iff it contains `pos` and is now full — it was necessarily one
+// short before, since `pos` was empty. The placed tile's own section pays (centre 1, ring 3); each
+// completed junction gap pays 2. Bonuses stack across overlapping regions.
+function regionCoins(after: Garden, pos: TilePosition): number {
+  let coins = 0;
+  const section = after[pos.slot];
+  if (section && section.tiles.every((t) => t !== null)) {
+    coins += pos.slot === 0 ? CENTRE_COIN : RING_COIN;
+  }
+  for (const gap of JUNCTION_GAPS) {
+    if (!gap.some((p) => posKey(p) === posKey(pos))) continue;
+    if (gap.every((p) => tileAtPosition(after, p) !== null)) coins += GAP_COIN;
+  }
+  return coins;
+}
+
 // --- public API ---
+
+// The coin reward for placing `action`'s tile: `max` is what the completed regions are worth;
+// `actual` is how many fit once the placed tile and payment have left the tile area (which is
+// capped at STORAGE_TILE_LIMIT). When `actual < max` the excess is forfeited — the UI uses this to
+// warn before committing. Assumes the placement is legal (callers gate on `placeTileIllegalReason`).
+export function placeTileCoins(state: State, action: PlaceTileAction): { max: number; actual: number } {
+  const player = state.players[state.currentPlayer]!;
+  const { tile, slot, dir, payment } = action;
+  const after = placeTileOn(player.garden, slot, dir, tile);
+  const storage = spend(player.storage, [tile, ...payment.tiles], payment.sections, payment.coins);
+  const max = regionCoins(after, { slot, dir });
+  const room = Math.max(0, STORAGE_TILE_LIMIT - storage.tileArea.length);
+  return { max, actual: Math.min(max, room) };
+}
 
 export function placeTileIllegalReason(state: State, action: PlaceTileAction): string | null {
   const player = state.players[state.currentPlayer]!;
@@ -241,15 +280,19 @@ export function placeSectionIllegalReason(state: State, action: PlaceSectionActi
 
 export function resolvePlaceTile(state: State, action: PlaceTileAction): State {
   const { tile, slot, dir, payment } = action;
-  const players = state.players.map((p, i) =>
-    i === state.currentPlayer
-      ? {
-          ...p,
-          storage: spend(p.storage, [tile, ...payment.tiles], payment.sections, payment.coins),
-          garden: placeTileOn(p.garden, slot, dir, tile),
-        }
-      : p,
-  );
+  const { actual } = placeTileCoins(state, action); // coins earned, already capped to storage room
+  const players = state.players.map((p, i) => {
+    if (i !== state.currentPlayer) return p;
+    const spent = spend(p.storage, [tile, ...payment.tiles], payment.sections, payment.coins);
+    return {
+      ...p,
+      storage: {
+        ...spent,
+        tileArea: [...spent.tileArea, ...Array.from({ length: actual }, () => coinItem)],
+      },
+      garden: placeTileOn(p.garden, slot, dir, tile),
+    };
+  });
   return { ...state, players, supply: discardPaymentTiles(state, payment) };
 }
 

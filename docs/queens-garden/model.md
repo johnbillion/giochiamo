@@ -4,7 +4,8 @@
 > the engine from. Organized by the same five questions from `MODELLING.md`,
 > scaled up. Resolvers stay stubbed until Pass 3.
 
-**Target player count (first build):** _(TBD — pick one to cut branching; 2P suggested)_
+**Target player count (first build):** general **2–4** — the engine isn't specialised to one
+count; player count only feeds `sectionsPerRound = playerCount + 3`.
 
 ---
 
@@ -36,7 +37,7 @@ fields that can't be derived (the chess-castling lesson).
 
 | Region | Fields | Notes |
 |---|---|---|
-| Supply / pools | **Tile bag** (remaining of 108) + **discard pile** + **section pool** (remaining of ~36) + **seed** | bag-empty → shuffle discard back in (seed-driven, must be logged); batch draws & section picks seed-driven |
+| Supply / pools | **Tile bag** (remaining of 108) + **discard pile** + **section pool** (remaining of 36) + **seed** | bag-empty → shuffle discard back in (seed-driven, must be logged); batch draws & section picks seed-driven |
 | Central area (per round) | **Pile** of this round's n sections (n=5/6/7); the **top** section holds 4 tiles; **split-off sections** each hold their leftover tiles (still draftable). Draft source = **all tiles in the central area**. A section is **takeable once emptied** (derived: tiles == 0). | top splits when <4 → next revealed w/ 4 fresh; leftovers discarded at round end |
 | Scoring wheel | _(current position)_ | changes per round |
 | Per player | **Play area** = 7 section slots (1 centre + 6 edge); centre starts with the **blank starter section** (6 free spaces, no identity), edges start empty. Each placed **non-centre section** carries a (colour, symbol) **identity tile** in 1 slot, leaving **5 free**. **Storage**: an **ordered tile area** (`StorageItem[]` of tiles + coins, ≤ **12**; starts with 3 coins; rearrangeable) + **2 sections**. **Score**. **Passed-this-round** flag. | section identity is game-relevant (scoring); ≤ 6 + 6×5 = **36** placeable spaces; passed-flag stored |
@@ -76,7 +77,7 @@ pure state transform. Filled in Pass 2.
 the item itself*. Pay the remaining `cost − 1` with **matching items** (sharing the placed item's
 colour *or* symbol — one axis, no duplicates) and/or **coins** (each a wildcard worth 1). All
 payment items + coins are discarded.
-| Pass | — | it's your turn & not yet passed | mark passed this round; _(cost/turn-order effect TBD)_ |
+| Pass | — | it's your turn & not yet passed | mark passed this round; the **first** passer takes **−1** at round scoring and **leads the next round**. When the pass that makes everyone passed resolves, round scoring + the round transition run in the same step (see #22) |
 
 ## Resolvers (stubbed until Pass 3)
 
@@ -226,6 +227,26 @@ gets an entry — these are the future-bugs we're heading off.
     is now wired into `PlayerState`; `availableActionTypes` gates place actions on *holding* the
     item (necessary, not sufficient — concrete legality is `illegalReason`). Tested: free & paid
     placement, adjacency (match-one / mismatch), run duplicates, underpayment, section placement.
+
+30. **Coins — earning RESOLVED (spending was #22).** A player earns coins by placing the tile that
+    **completes a 6-tile region** (the sixth tile): **centre section → 1**, **a ring section → 3**,
+    **a junction gap → 2** (the 6 holes where two adjacent ring sections meet the centre, ringed by
+    2 centre + 2+2 ring petals). Bonuses **stack** — one tile can complete several overlapping
+    regions (a centre petal is shared by the centre section + 2 gaps → up to 1+2+2 = **5**). Only a
+    **tile** placement can earn (a freshly placed section lays one tile, never a sixth), so coin
+    logic lives only in `resolvePlaceTile`.
+    - **Geometry resurrected (lean).** This re-needs the per-region position sets dropped in #27 —
+      but **membership only, no cyclic order** (unlike the old run `LINES`). Sections are trivial
+      (a slot's 6 dirs, "full" = no nulls); the 6 **junction gaps** are re-derived from `crossPair`
+      + the ring pairs and exported as `JUNCTION_GAPS` in `garden.ts`. Completion test: a region
+      containing the placed position that is full in the after-state (it was one short before, the
+      placed cell having been empty).
+    - **Storage cap RESOLVED.** Earned coins enter the tile area and **respect the 12-slot cap**;
+      excess is **lost**. The engine exposes `placeTileCoins(state, action) → { max, actual }`:
+      `max` is the region payout, `actual = min(max, room after the placed tile + payment leave the
+      tile area)`. `resolvePlaceTile` adds `actual`; the UI uses the `max > actual` gap to warn.
+    - **OPEN:** earned coins come from an unbounded supply (no coin bank modelled), mirroring the
+      payment side where spent coins leave play (#23c). Revisit if a finite coin pool matters.
 
 ## Design notes
 

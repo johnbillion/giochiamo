@@ -64,3 +64,43 @@ export function tileAtPosition(garden: Garden, pos: TilePosition): Tile | null {
   const section = garden[pos.slot];
   return section ? tileAt(section, pos.dir) : null;
 }
+
+// --- coin-scoring regions ---
+// Completing a 6-tile region with a placed tile earns coins (see placement.ts / rules.md). The
+// regions are the 7 section frames — membership is trivial (a slot's 6 dirs), "full" = no nulls —
+// and the 6 "junction gaps" below. Unlike the old run `LINES`, these need only set membership, not
+// cyclic order, so no `orderCycle` is required.
+
+const DIRECTIONS: readonly Direction[] = [0, 1, 2, 3, 4, 5];
+
+// The petal pair straddling the shared edge between two adjacent sections, or null if they don't
+// touch: `a`'s petal facing `b`, and `b`'s petal facing back (dir + 3).
+function crossPair(a: SlotId, b: SlotId): readonly [TilePosition, TilePosition] | null {
+  for (const d of DIRECTIONS) {
+    if (neighbourSlot(a, d) === b) {
+      return [
+        { slot: a, dir: d },
+        { slot: b, dir: ((d + 3) % 6) as Direction },
+      ];
+    }
+  }
+  return null;
+}
+
+// Adjacent ring-slot pairs around the centre (cyclic).
+const RING_PAIRS: readonly (readonly [SlotId, SlotId])[] = [
+  [1, 2],
+  [2, 3],
+  [3, 4],
+  [4, 5],
+  [5, 6],
+  [6, 1],
+];
+
+// The six junction gaps: each the set of 6 petals ringing the hole where the centre meets two
+// adjacent ring sections — 2 petals from the centre + 2 from each of the two ring sections.
+export const JUNCTION_GAPS: readonly TilePosition[][] = RING_PAIRS.map(([a, b]) => [
+  ...crossPair(0, a)!,
+  ...crossPair(0, b)!,
+  ...crossPair(a, b)!,
+]);

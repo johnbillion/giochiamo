@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyAction, isLegal } from './engine';
-import { createStarterGarden, tileAt } from './garden';
+import { createStarterGarden, JUNCTION_GAPS, tileAt, type TilePosition } from './garden';
+import { placeTileCoins } from './placement';
 import { coinItem, storageCoins, storageTiles, tileItem } from './types';
 import type {
   Colour,
   Direction,
   Garden,
   Payment,
+  PlacedSection,
+  PlaceTileAction,
   PlayerState,
   PlayerStorage,
   Section,
+  SlotId,
   State,
   Symbol,
   Tile,
@@ -177,5 +181,114 @@ describe('place section', () => {
     // slot 0 (centre) already holds the starter section
     const action = { type: ActionType.PlaceSection, section, slot: 0, identityDir: 0, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(false);
+  });
+});
+
+// A garden with the given positions occupied. Tile values are irrelevant to coin geometry (the
+// region checks only test occupancy), so we fill with an arbitrary tile.
+function gardenWithPositions(positions: readonly TilePosition[]): Garden {
+  const slots: (PlacedSection | null)[] = [null, null, null, null, null, null, null];
+  for (const p of positions) {
+    const tiles: (Tile | null)[] = slots[p.slot]
+      ? [...slots[p.slot]!.tiles]
+      : [null, null, null, null, null, null];
+    tiles[p.dir] = tile('red', 'acorn');
+    slots[p.slot] = { tiles };
+  }
+  return slots;
+}
+
+const placeAcorn = (slot: SlotId, dir: Direction): PlaceTileAction => ({
+  type: ActionType.PlaceTile,
+  tile: tile('red', 'acorn'),
+  slot,
+  dir,
+  payment: NO_PAYMENT,
+});
+
+// A ring section filled at dirs 1–5 with distinct-symbol reds (a legal arc), dir 0 left empty.
+const ringRedsMissingDir0 = (): (Tile | null)[] => {
+  const symbols: Symbol[] = ['bird', 'clover', 'flower', 'leaf', 'pinecone'];
+  const tiles: (Tile | null)[] = [null, null, null, null, null, null];
+  [1, 2, 3, 4, 5].forEach((dir, i) => (tiles[dir] = tile('red', symbols[i]!)));
+  return tiles;
+};
+
+describe('earning coins (completion bonuses)', () => {
+  it('earns 1 coin for completing the centre section', () => {
+    const symbols: Symbol[] = ['bird', 'clover', 'flower', 'leaf', 'pinecone'];
+    const garden = centreWith(
+      ([1, 2, 3, 4, 5] as Direction[]).map((dir, i) => ({ dir, tile: tile('red', symbols[i]!) })),
+    );
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
+    const s1 = applyAction(s0, placeAcorn(0, 0));
+    expect(storageCoins(s1.players[0]!.storage)).toBe(1);
+  });
+
+  it('earns 3 coins for completing a ring section', () => {
+    const garden: Garden = [
+      { tiles: [null, null, null, null, null, null] },
+      { tiles: ringRedsMissingDir0() },
+      null,
+      null,
+      null,
+      null,
+      null,
+    ];
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
+    const s1 = applyAction(s0, placeAcorn(1, 0));
+    expect(storageCoins(s1.players[0]!.storage)).toBe(3);
+  });
+
+  it('earns 2 coins for completing a junction gap', () => {
+    const gap = JUNCTION_GAPS[0]!;
+    const target = gap[0]!;
+    const s0 = makeState(gardenWithPositions(gap.slice(1)), {
+      tileArea: [tileItem(tile('red', 'acorn'))],
+      sections: [],
+    });
+    expect(placeTileCoins(s0, placeAcorn(target.slot, target.dir))).toEqual({ max: 2, actual: 2 });
+  });
+
+  it('stacks bonuses: one tile completing the centre section and two gaps earns 5', () => {
+    const target: TilePosition = { slot: 0, dir: 0 };
+    const gapsThroughTarget = JUNCTION_GAPS.filter((g) =>
+      g.some((p) => p.slot === target.slot && p.dir === target.dir),
+    );
+    expect(gapsThroughTarget).toHaveLength(2); // a centre petal sits on exactly two gaps
+
+    const occupied = new Map<string, TilePosition>();
+    const add = (p: TilePosition): void => {
+      if (p.slot === target.slot && p.dir === target.dir) return; // leave the target empty
+      occupied.set(`${p.slot}:${p.dir}`, p);
+    };
+    ([0, 1, 2, 3, 4, 5] as Direction[]).forEach((dir) => add({ slot: 0, dir })); // centre minus target
+    for (const g of gapsThroughTarget) for (const p of g) add(p); // both gaps minus target
+
+    const s0 = makeState(gardenWithPositions([...occupied.values()]), {
+      tileArea: [tileItem(tile('red', 'acorn'))],
+      sections: [],
+    });
+    expect(placeTileCoins(s0, placeAcorn(target.slot, target.dir)).max).toBe(5); // 1 + 2 + 2
+  });
+
+  it('caps earned coins at available storage, reporting max vs actual', () => {
+    const garden: Garden = [
+      { tiles: [null, null, null, null, null, null] },
+      { tiles: ringRedsMissingDir0() },
+      null,
+      null,
+      null,
+      null,
+      null,
+    ];
+    // tile area full at 12 (the placed tile + 11 coins); placing frees one slot → room for 1 coin.
+    const tileArea = [tileItem(tile('red', 'acorn')), ...Array.from({ length: 11 }, () => coinItem)];
+    const s0 = makeState(garden, { tileArea, sections: [] });
+    const action = placeAcorn(1, 0);
+
+    expect(placeTileCoins(s0, action)).toEqual({ max: 3, actual: 1 });
+    const s1 = applyAction(s0, action);
+    expect(storageCoins(s1.players[0]!.storage)).toBe(12); // 11 kept + 1 earned, the other 2 lost
   });
 });
