@@ -9,11 +9,11 @@ import type {
   Direction,
   Garden,
   Payment,
-  PlacedSection,
+  PlacedExpansion,
   PlaceTileAction,
   PlayerState,
   PlayerStorage,
-  Section,
+  Expansion,
   SlotId,
   State,
   Symbol,
@@ -22,12 +22,12 @@ import type {
 import { ActionType } from './types';
 
 const tile = (colour: Colour, symbol: Symbol): Tile => ({ colour, symbol });
-const NO_PAYMENT: Payment = { tiles: [], sections: [], coins: 0 };
+const NO_PAYMENT: Payment = { tiles: [], expansions: [], coins: 0 };
 
 const emptyPlayer = (): PlayerState => ({
   passed: false,
   score: 0,
-  storage: { tileArea: [], sections: [] },
+  storage: { tileArea: [], expansions: [] },
   garden: createStarterGarden(),
 });
 
@@ -38,12 +38,12 @@ function makeState(garden: Garden, storage: PlayerStorage): State {
     players: [{ passed: false, score: 0, storage, garden }, emptyPlayer()],
     currentPlayer: 0,
     firstPasser: null,
-    supply: { bag: [], discard: [], sections: [] },
+    supply: { bag: [], discard: [], expansions: [] },
     central: { top: null, open: [], pile: [] },
   };
 }
 
-// A garden whose centre section holds the given tiles, every ring slot empty.
+// A garden whose centre expansion holds the given tiles, every ring slot empty.
 function centreWith(entries: { dir: Direction; tile: Tile }[]): Garden {
   const tiles: (Tile | null)[] = [null, null, null, null, null, null];
   for (const e of entries) tiles[e.dir] = e.tile;
@@ -51,9 +51,9 @@ function centreWith(entries: { dir: Direction; tile: Tile }[]): Garden {
 }
 
 describe('place tile', () => {
-  it('places a cost-1 tile for free onto a section space', () => {
+  it('places a cost-1 tile for free onto a expansion space', () => {
     // 'acorn' is the first symbol → cost 1 → pays for itself.
-    const s0 = makeState(createStarterGarden(), { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
+    const s0 = makeState(createStarterGarden(), { tileArea: [tileItem(tile('red', 'acorn'))], expansions: [] });
     const s1 = applyAction(s0, { type: ActionType.PlaceTile, tile: tile('red', 'acorn'), slot: 0, dir: 0, payment: NO_PAYMENT });
 
     expect(tileAt(s1.players[0]!.garden[0]!, 0)).toEqual(tile('red', 'acorn'));
@@ -64,9 +64,9 @@ describe('place tile', () => {
     // 'bird' is the second symbol → cost 2 → needs 1 more, paid with a colour-match.
     const s0 = makeState(createStarterGarden(), {
       tileArea: [tileItem(tile('red', 'bird')), tileItem(tile('red', 'clover'))],
-      sections: [],
+      expansions: [],
     });
-    const payment: Payment = { tiles: [tile('red', 'clover')], sections: [], coins: 0 };
+    const payment: Payment = { tiles: [tile('red', 'clover')], expansions: [], coins: 0 };
     const s1 = applyAction(s0, { type: ActionType.PlaceTile, tile: tile('red', 'bird'), slot: 0, dir: 0, payment });
 
     expect(tileAt(s1.players[0]!.garden[0]!, 0)).toEqual(tile('red', 'bird'));
@@ -75,14 +75,14 @@ describe('place tile', () => {
   });
 
   it('is illegal to underpay', () => {
-    const s0 = makeState(createStarterGarden(), { tileArea: [tileItem(tile('red', 'bird'))], sections: [] });
+    const s0 = makeState(createStarterGarden(), { tileArea: [tileItem(tile('red', 'bird'))], expansions: [] });
     const action = { type: ActionType.PlaceTile, tile: tile('red', 'bird'), slot: 0, dir: 0, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(false); // cost 2, paid 0
   });
 
-  it('is illegal to place onto an empty garden area with no section', () => {
-    const s0 = makeState(createStarterGarden(), { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
-    // slot 1 is an empty ring slot (no section placed)
+  it('is illegal to place onto an empty garden area with no expansion', () => {
+    const s0 = makeState(createStarterGarden(), { tileArea: [tileItem(tile('red', 'acorn'))], expansions: [] });
+    // slot 1 is an empty ring slot (no expansion placed)
     const action = { type: ActionType.PlaceTile, tile: tile('red', 'acorn'), slot: 1, dir: 0, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(false);
   });
@@ -91,18 +91,18 @@ describe('place tile', () => {
     const garden = centreWith([{ dir: 0, tile: tile('red', 'acorn') }]);
     const s0 = makeState(garden, {
       tileArea: [tileItem(tile('blue', 'bird')), tileItem(tile('blue', 'clover'))],
-      sections: [],
+      expansions: [],
     });
     // payment is valid (blue/clover shares the blue colour); the only problem is the adjacency —
     // blue/bird next to red/acorn matches neither colour nor symbol.
-    const payment: Payment = { tiles: [tile('blue', 'clover')], sections: [], coins: 0 };
+    const payment: Payment = { tiles: [tile('blue', 'clover')], expansions: [], coins: 0 };
     const action = { type: ActionType.PlaceTile, tile: tile('blue', 'bird'), slot: 0, dir: 1, payment } as const;
     expect(isLegal(s0, action)).toBe(false);
   });
 
   it('allows an adjacency that matches exactly one attribute', () => {
     const garden = centreWith([{ dir: 0, tile: tile('red', 'acorn') }]);
-    const s0 = makeState(garden, { tileArea: [tileItem(tile('blue', 'acorn'))], sections: [] });
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('blue', 'acorn'))], expansions: [] });
     // blue/acorn shares the symbol (not the colour) with red/acorn, and 'acorn' is cost-1 → free & legal
     const action = { type: ActionType.PlaceTile, tile: tile('blue', 'acorn'), slot: 0, dir: 1, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(true);
@@ -117,8 +117,8 @@ describe('place tile', () => {
       { dir: 2, tile: tile('yellow', 'clover') },
       { dir: 4, tile: tile('blue', 'bird') },
     ]);
-    const s0 = makeState(garden, { tileArea: [tileItem(tile('green', 'bird')), coinItem], sections: [] });
-    const payment: Payment = { tiles: [], sections: [], coins: 1 };
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('green', 'bird')), coinItem], expansions: [] });
+    const payment: Payment = { tiles: [], expansions: [], coins: 1 };
     const action = { type: ActionType.PlaceTile, tile: tile('green', 'bird'), slot: 0, dir: 3, payment } as const;
     expect(isLegal(s0, action)).toBe(true);
   });
@@ -132,9 +132,9 @@ describe('place tile', () => {
     ]);
     const s0 = makeState(garden, {
       tileArea: [tileItem(tile('red', 'leaf')), coinItem, coinItem, coinItem, coinItem],
-      sections: [],
+      expansions: [],
     });
-    const payment: Payment = { tiles: [], sections: [], coins: 4 }; // 'leaf' is cost 5 → pay 4
+    const payment: Payment = { tiles: [], expansions: [], coins: 4 }; // 'leaf' is cost 5 → pay 4
     const action = { type: ActionType.PlaceTile, tile: tile('red', 'leaf'), slot: 0, dir: 3, payment } as const;
     expect(isLegal(s0, action)).toBe(false);
   });
@@ -146,7 +146,7 @@ describe('place tile', () => {
       { dir: 0, tile: tile('red', 'acorn') },
       { dir: 1, tile: tile('red', 'bird') },
     ]);
-    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], expansions: [] });
     const action = { type: ActionType.PlaceTile, tile: tile('red', 'acorn'), slot: 0, dir: 2, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(false);
   });
@@ -164,17 +164,17 @@ describe('place tile', () => {
       { dir: 2, tile: tile('blue', 'bird') },
       { dir: 3, tile: tile('blue', 'acorn') },
     ]);
-    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], expansions: [] });
     const action = { type: ActionType.PlaceTile, tile: tile('red', 'acorn'), slot: 0, dir: 4, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(true);
   });
 
-  it('rejects a mono-colour run that bends across a section boundary to join identical tiles', () => {
+  it('rejects a mono-colour run that bends across a expansion boundary to join identical tiles', () => {
     // A red run turns a corner the old fixed-line model could not see. The centre holds
     // dir5 = red/acorn and dir0 = red/bird; placing red/acorn across the shared edge on slot 1
     // (its dir3 faces the centre's dir0) forms one red run
     //   slot1·dir3 red/acorn — centre·dir0 red/bird — centre·dir5 red/acorn
-    // joining two red/acorns. No single section-ring or junction-ring contains all three.
+    // joining two red/acorns. No single expansion-ring or junction-ring contains all three.
     const garden: Garden = [
       { tiles: [tile('red', 'bird'), null, null, null, null, tile('red', 'acorn')] },
       { tiles: [null, null, null, null, null, null] }, // a placed (empty) frame on slot 1
@@ -184,33 +184,33 @@ describe('place tile', () => {
       null,
       null,
     ];
-    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], expansions: [] });
     const action = { type: ActionType.PlaceTile, tile: tile('red', 'acorn'), slot: 1, dir: 3, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(false);
   });
 });
 
-describe('place section', () => {
+describe('place expansion', () => {
   it('drops a frame and places its identity tile, paying the cost', () => {
     // 'flower' is the 4th symbol → cost 4 → needs 3, here paid with 3 coins.
-    const section: Section = { identity: tile('red', 'flower') };
+    const expansion: Expansion = { identity: tile('red', 'flower') };
     const s0 = makeState(createStarterGarden(), {
       tileArea: [coinItem, coinItem, coinItem],
-      sections: [section],
+      expansions: [expansion],
     });
-    const payment: Payment = { tiles: [], sections: [], coins: 3 };
-    const s1 = applyAction(s0, { type: ActionType.PlaceSection, section, slot: 1, identityDir: 0, payment });
+    const payment: Payment = { tiles: [], expansions: [], coins: 3 };
+    const s1 = applyAction(s0, { type: ActionType.PlaceExpansion, expansion, slot: 1, identityDir: 0, payment });
 
     expect(tileAt(s1.players[0]!.garden[1]!, 0)).toEqual(tile('red', 'flower'));
-    expect(s1.players[0]!.storage.sections).toHaveLength(0);
+    expect(s1.players[0]!.storage.expansions).toHaveLength(0);
     expect(storageCoins(s1.players[0]!.storage)).toBe(0);
   });
 
-  it('is illegal to place a section into a non-empty slot', () => {
-    const section: Section = { identity: tile('red', 'acorn') }; // cost 1, free
-    const s0 = makeState(createStarterGarden(), { tileArea: [], sections: [section] });
-    // slot 0 (centre) already holds the starter section
-    const action = { type: ActionType.PlaceSection, section, slot: 0, identityDir: 0, payment: NO_PAYMENT } as const;
+  it('is illegal to place a expansion into a non-empty slot', () => {
+    const expansion: Expansion = { identity: tile('red', 'acorn') }; // cost 1, free
+    const s0 = makeState(createStarterGarden(), { tileArea: [], expansions: [expansion] });
+    // slot 0 (centre) already holds the starter expansion
+    const action = { type: ActionType.PlaceExpansion, expansion, slot: 0, identityDir: 0, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(false);
   });
 });
@@ -218,7 +218,7 @@ describe('place section', () => {
 // A garden with the given positions occupied. Tile values are irrelevant to coin geometry (the
 // region checks only test occupancy), so we fill with an arbitrary tile.
 function gardenWithPositions(positions: readonly TilePosition[]): Garden {
-  const slots: (PlacedSection | null)[] = [null, null, null, null, null, null, null];
+  const slots: (PlacedExpansion | null)[] = [null, null, null, null, null, null, null];
   for (const p of positions) {
     const tiles: (Tile | null)[] = slots[p.slot]
       ? [...slots[p.slot]!.tiles]
@@ -237,7 +237,7 @@ const placeAcorn = (slot: SlotId, dir: Direction): PlaceTileAction => ({
   payment: NO_PAYMENT,
 });
 
-// A ring section filled at dirs 1–5 with distinct-symbol reds (a legal arc), dir 0 left empty.
+// A ring expansion filled at dirs 1–5 with distinct-symbol reds (a legal arc), dir 0 left empty.
 const ringRedsMissingDir0 = (): (Tile | null)[] => {
   const symbols: Symbol[] = ['bird', 'clover', 'flower', 'leaf', 'pinecone'];
   const tiles: (Tile | null)[] = [null, null, null, null, null, null];
@@ -246,17 +246,17 @@ const ringRedsMissingDir0 = (): (Tile | null)[] => {
 };
 
 describe('earning coins (completion bonuses)', () => {
-  it('earns 1 coin for completing the centre section', () => {
+  it('earns 1 coin for completing the centre expansion', () => {
     const symbols: Symbol[] = ['bird', 'clover', 'flower', 'leaf', 'pinecone'];
     const garden = centreWith(
       ([1, 2, 3, 4, 5] as Direction[]).map((dir, i) => ({ dir, tile: tile('red', symbols[i]!) })),
     );
-    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], expansions: [] });
     const s1 = applyAction(s0, placeAcorn(0, 0));
     expect(storageCoins(s1.players[0]!.storage)).toBe(1);
   });
 
-  it('earns 3 coins for completing a ring section', () => {
+  it('earns 3 coins for completing a ring expansion', () => {
     const garden: Garden = [
       { tiles: [null, null, null, null, null, null] },
       { tiles: ringRedsMissingDir0() },
@@ -266,7 +266,7 @@ describe('earning coins (completion bonuses)', () => {
       null,
       null,
     ];
-    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], sections: [] });
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'acorn'))], expansions: [] });
     const s1 = applyAction(s0, placeAcorn(1, 0));
     expect(storageCoins(s1.players[0]!.storage)).toBe(3);
   });
@@ -276,12 +276,12 @@ describe('earning coins (completion bonuses)', () => {
     const target = gap[0]!;
     const s0 = makeState(gardenWithPositions(gap.slice(1)), {
       tileArea: [tileItem(tile('red', 'acorn'))],
-      sections: [],
+      expansions: [],
     });
     expect(placeTileCoins(s0, placeAcorn(target.slot, target.dir))).toEqual({ max: 2, actual: 2 });
   });
 
-  it('stacks bonuses: one tile completing the centre section and two gaps earns 5', () => {
+  it('stacks bonuses: one tile completing the centre expansion and two gaps earns 5', () => {
     const target: TilePosition = { slot: 0, dir: 0 };
     const gapsThroughTarget = JUNCTION_GAPS.filter((g) =>
       g.some((p) => p.slot === target.slot && p.dir === target.dir),
@@ -298,7 +298,7 @@ describe('earning coins (completion bonuses)', () => {
 
     const s0 = makeState(gardenWithPositions([...occupied.values()]), {
       tileArea: [tileItem(tile('red', 'acorn'))],
-      sections: [],
+      expansions: [],
     });
     expect(placeTileCoins(s0, placeAcorn(target.slot, target.dir)).max).toBe(5); // 1 + 2 + 2
   });
@@ -315,7 +315,7 @@ describe('earning coins (completion bonuses)', () => {
     ];
     // tile area full at 12 (the placed tile + 11 coins); placing frees one slot → room for 1 coin.
     const tileArea = [tileItem(tile('red', 'acorn')), ...Array.from({ length: 11 }, () => coinItem)];
-    const s0 = makeState(garden, { tileArea, sections: [] });
+    const s0 = makeState(garden, { tileArea, expansions: [] });
     const action = placeAcorn(1, 0);
 
     expect(placeTileCoins(s0, action)).toEqual({ max: 3, actual: 1 });

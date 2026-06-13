@@ -25,7 +25,7 @@ import {
   type Garden,
   type Payment,
   type PlayerCount,
-  type Section,
+  type Expansion,
   type SlotId,
   type State,
   type Symbol,
@@ -33,7 +33,7 @@ import {
 } from './types';
 
 const tileStr = (t: Tile): string => `${t.colour}/${t.symbol}`;
-const sectionStr = (s: Section): string => (s.identity ? tileStr(s.identity) : 'blank');
+const expansionStr = (s: Expansion): string => (s.identity ? tileStr(s.identity) : 'blank');
 const attrStr = (a: Attribute): string => (a.kind === 'colour' ? a.colour : a.symbol);
 
 // --- garden ASCII rendering ---
@@ -45,7 +45,7 @@ const tileChar = (t: Tile): string =>
 
 // The (line, c) grid position of every tile slot, indexed [slot][dir], derived from the board
 // geometry so the picture mirrors true adjacency. `line` is 1-based (1–12); the character column
-// is `2*c - 1`. The gaps left in the grid are the 7 decorative section-centre holes.
+// is `2*c - 1`. The gaps left in the grid are the 7 decorative expansion-centre holes.
 const SLOT_LAYOUT: readonly (readonly (readonly [number, number])[])[] = [
   [[8, 5], [7, 4], [6, 4], [5, 5], [6, 6], [7, 6]], // slot 0 (centre)
   [[12, 5], [11, 4], [10, 4], [9, 5], [10, 6], [11, 6]], // slot 1
@@ -56,15 +56,15 @@ const SLOT_LAYOUT: readonly (readonly (readonly [number, number])[])[] = [
   [[10, 8], [9, 7], [8, 7], [7, 8], [8, 9], [9, 9]], // slot 6
 ];
 
-// One player's garden as 12 lines: a tile shows its character, an empty space of a placed section
-// shows '.', and a slot with no section yet shows 'o' (so the empty board is the bare skeleton).
+// One player's garden as 12 lines: a tile shows its character, an empty space of a placed expansion
+// shows '.', and a slot with no expansion yet shows 'o' (so the empty board is the bare skeleton).
 function renderGarden(garden: Garden): string {
   const rows: string[][] = Array.from({ length: 12 }, () => Array<string>(17).fill(' '));
   SLOT_LAYOUT.forEach((dirs, slot) => {
-    const section = garden[slot];
+    const expansion = garden[slot];
     dirs.forEach(([line, c], dir) => {
-      const tile = section ? section.tiles[dir] ?? null : null;
-      rows[line - 1]![2 * c - 2] = section ? (tile ? tileChar(tile) : '.') : 'o';
+      const tile = expansion ? expansion.tiles[dir] ?? null : null;
+      rows[line - 1]![2 * c - 2] = expansion ? (tile ? tileChar(tile) : '.') : 'o';
     });
   });
   return rows.map((r) => r.join('').replace(/ +$/, '')).join('\n');
@@ -83,8 +83,8 @@ function legendText(): string {
 }
 
 // Console ergonomics: accept a partial payment (e.g. `{ coins: 2 }`) and fill in the rest, so the
-// untyped browser boundary doesn't crash the typed engine on a missing `tiles`/`sections`.
-const toPayment = (p: Partial<Payment> = {}): Payment => ({ tiles: [], sections: [], coins: 0, ...p });
+// untyped browser boundary doesn't crash the typed engine on a missing `tiles`/`expansions`.
+const toPayment = (p: Partial<Payment> = {}): Payment => ({ tiles: [], expansions: [], coins: 0, ...p });
 
 export function render(state: State): string {
   const phase = status(state);
@@ -96,10 +96,10 @@ export function render(state: State): string {
     const turn = phase === Phase.Playing && i === state.currentPlayer ? '>' : ' ';
     const passed = p.passed ? ' [passed]' : '';
     const tiles = storageTiles(p.storage);
-    const sections = p.storage.sections;
+    const expansions = p.storage.expansions;
     lines.push(`${turn} P${i}  score ${p.score}  ${storageCoins(p.storage)}c${passed}`);
     lines.push(`    tiles (${tiles.length}): ${tiles.map(tileStr).join(', ') || '—'}`);
-    lines.push(`    sections (${sections.length}): ${sections.map(sectionStr).join(', ') || '—'}`);
+    lines.push(`    expansions (${expansions.length}): ${expansions.map(expansionStr).join(', ') || '—'}`);
     lines.push(renderGarden(p.garden));
   });
 
@@ -108,7 +108,7 @@ export function render(state: State): string {
   state.central.open.forEach((d, i) => {
     const body = d.tiles.length
       ? d.tiles.map(tileStr).join(', ')
-      : `(section ${d.section.identity ? tileStr(d.section.identity) : 'starter'})`;
+      : `(expansion ${d.expansion.identity ? tileStr(d.expansion.identity) : 'starter'})`;
     lines.push(`  open[${i}]: ${body}`);
   });
   lines.push(`  pile: ${state.central.pile.length} face-down`);
@@ -134,14 +134,14 @@ export function newGame(playerCount: PlayerCount = 2, seed = 1, firstPlayer = 0)
     console.log(
       [
         "Queen's Garden playground — commands:",
-        '  g.draftColour(c)   take every draftable tile/section of colour c',
-        '  g.draftSymbol(s)   take every draftable tile/section of symbol s',
+        '  g.draftColour(c)   take every draftable tile/expansion of colour c',
+        '  g.draftSymbol(s)   take every draftable tile/expansion of symbol s',
         '  g.draft(attr)      draft by { kind: "colour" | "symbol", ... }',
-        '  g.placeSection(section, slot, dir, payment?)  place a section (identity faces dir)',
-        '  g.placeTile(tile, slot, dir, payment?)        place a tile on a section space',
+        '  g.placeExpansion(expansion, slot, dir, payment?)  place a expansion (identity faces dir)',
+        '  g.placeTile(tile, slot, dir, payment?)        place a tile on a expansion space',
         '  g.pass()           pass for the rest of the round',
         '  g.move(from, to)   rearrange your tile storage (free, no turn cost)',
-        '  g.moveSection(f,t) rearrange your section storage (free)',
+        '  g.moveExpansion(f,t) rearrange your expansion storage (free)',
         '  g.draftable()      attributes you could draft right now',
         '  g.actions()        action kinds available right now',
         '  g.show()           reprint the current board',
@@ -162,14 +162,14 @@ export function newGame(playerCount: PlayerCount = 2, seed = 1, firstPlayer = 0)
       if (item) order.splice(to, 0, item);
       return act({ type: ActionType.Reorder, area: 'tiles', order });
     },
-    moveSection: (from: number, to: number): State => {
-      const order = [...state.players[state.currentPlayer]!.storage.sections];
+    moveExpansion: (from: number, to: number): State => {
+      const order = [...state.players[state.currentPlayer]!.storage.expansions];
       const [item] = order.splice(from, 1);
       if (item) order.splice(to, 0, item);
-      return act({ type: ActionType.Reorder, area: 'sections', order });
+      return act({ type: ActionType.Reorder, area: 'expansions', order });
     },
-    placeSection: (section: Section, slot: SlotId, identityDir: Direction, payment?: Partial<Payment>): State =>
-      act({ type: ActionType.PlaceSection, section, slot, identityDir, payment: toPayment(payment) }),
+    placeExpansion: (expansion: Expansion, slot: SlotId, identityDir: Direction, payment?: Partial<Payment>): State =>
+      act({ type: ActionType.PlaceExpansion, expansion, slot, identityDir, payment: toPayment(payment) }),
     placeTile: (tile: Tile, slot: SlotId, dir: Direction, payment?: Partial<Payment>): State =>
       act({ type: ActionType.PlaceTile, tile, slot, dir, payment: toPayment(payment) }),
     pass: (): State => act({ type: ActionType.Pass }),

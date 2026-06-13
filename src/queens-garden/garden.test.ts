@@ -8,7 +8,7 @@ import {
   tileAt,
   type TilePosition,
 } from './garden';
-import type { Direction, PlacedSection, SlotId, Tile } from './types';
+import type { Direction, PlacedExpansion, SlotId, Tile } from './types';
 
 const DIRECTIONS: Direction[] = [0, 1, 2, 3, 4, 5];
 const SLOTS: SlotId[] = [0, 1, 2, 3, 4, 5, 6];
@@ -16,7 +16,7 @@ const RING: SlotId[] = [1, 2, 3, 4, 5, 6];
 
 const key = (p: TilePosition): string => `${p.slot}:${p.dir}`;
 
-describe('garden topology — section adjacency', () => {
+describe('garden topology — expansion adjacency', () => {
   it('the centre is adjacent to all six ring slots', () => {
     const neighbours = DIRECTIONS.map((d) => neighbourSlot(0, d));
     expect(new Set(neighbours)).toEqual(new Set(RING));
@@ -45,7 +45,7 @@ describe('garden topology — section adjacency', () => {
 });
 
 describe('garden topology — tile adjacency', () => {
-  it('includes the two ring-neighbours within a section', () => {
+  it('includes the two ring-neighbours within a expansion', () => {
     const adj = adjacentPositions({ slot: 0, dir: 2 });
     expect(adj).toContainEqual({ slot: 0, dir: 1 });
     expect(adj).toContainEqual({ slot: 0, dir: 3 });
@@ -68,15 +68,15 @@ describe('garden topology — tile adjacency', () => {
   });
 });
 
-describe('sections & the starter', () => {
-  it('reads the tile on a section slot (the identity is just a placed tile)', () => {
+describe('expansions & the starter', () => {
+  it('reads the tile on a expansion slot (the identity is just a placed tile)', () => {
     const id: Tile = { colour: 'red', symbol: 'bird' };
-    const section: PlacedSection = { tiles: [null, null, id, null, null, null] };
-    expect(tileAt(section, 2)).toEqual(id);
-    expect(tileAt(section, 0)).toBeNull();
+    const expansion: PlacedExpansion = { tiles: [null, null, id, null, null, null] };
+    expect(tileAt(expansion, 2)).toEqual(id);
+    expect(tileAt(expansion, 0)).toBeNull();
   });
 
-  it('the starter garden has a blank centre section and an empty ring', () => {
+  it('the starter garden has a blank centre expansion and an empty ring', () => {
     const g = createStarterGarden();
     expect(g[0]).toEqual({ tiles: [null, null, null, null, null, null] });
     expect(g.slice(1).every((slot) => slot === null)).toBe(true);
@@ -84,15 +84,15 @@ describe('sections & the starter', () => {
 });
 
 describe('coin-scoring regions', () => {
-  it('has 6 junction gaps, each 6 petals across the centre + 2 ring sections', () => {
+  it('has 6 junction gaps, each 6 petals across the centre + 2 ring expansions', () => {
     expect(JUNCTION_GAPS).toHaveLength(6);
     for (const gap of JUNCTION_GAPS) {
       expect(gap).toHaveLength(6);
       const perSlot = new Map<SlotId, number>();
       for (const p of gap) perSlot.set(p.slot, (perSlot.get(p.slot) ?? 0) + 1);
-      expect(perSlot.size).toBe(3); // centre + two ring sections
+      expect(perSlot.size).toBe(3); // centre + two ring expansions
       expect(perSlot.get(0)).toBe(2); // two centre petals
-      expect([...perSlot.values()].every((c) => c === 2)).toBe(true); // 2 from each section
+      expect([...perSlot.values()].every((c) => c === 2)).toBe(true); // 2 from each expansion
     }
   });
 

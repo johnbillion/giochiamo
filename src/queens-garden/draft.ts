@@ -1,13 +1,13 @@
 // The draft action: choose a colour or symbol, then take one of each distinct matching tile
 // (the player picks which physical copy when a combo is draftable from more than one display)
-// plus every matching takeable (emptied) section — all gated by storage. See model.md.
+// plus every matching takeable (emptied) expansion — all gated by storage. See model.md.
 
 import { makeRng } from './rng';
 import { drawTiles } from './supply';
 import {
   ActionType,
   COLOURS,
-  STORAGE_SECTION_LIMIT,
+  STORAGE_EXPANSION_LIMIT,
   STORAGE_TILE_LIMIT,
   SYMBOLS,
   tileItem,
@@ -16,7 +16,7 @@ import {
   type Display,
   type DraftAction,
   type DraftSource,
-  type Section,
+  type Expansion,
   type State,
   type Tile,
   type TilePick,
@@ -57,11 +57,11 @@ function matchingCombos(central: CentralArea, attr: Attribute): Tile[] {
   return combos;
 }
 
-// Emptied (takeable) open sections matching the attribute.
-function matchingSections(central: CentralArea, attr: Attribute): Section[] {
+// Emptied (takeable) open expansions matching the attribute.
+function matchingExpansions(central: CentralArea, attr: Attribute): Expansion[] {
   return central.open
-    .filter((d) => d.tiles.length === 0 && d.section.identity !== null && matchesAttribute(d.section.identity, attr))
-    .map((d) => d.section);
+    .filter((d) => d.tiles.length === 0 && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr))
+    .map((d) => d.expansion);
 }
 
 function displayAt(central: CentralArea, source: DraftSource): Display | null {
@@ -85,9 +85,9 @@ export function draftIllegalReason(state: State, action: DraftAction): string | 
   const { central } = state;
   const player = state.players[state.currentPlayer]!;
   const combos = matchingCombos(central, action.attribute);
-  const sections = matchingSections(central, action.attribute);
+  const expansions = matchingExpansions(central, action.attribute);
 
-  if (combos.length === 0 && sections.length === 0) {
+  if (combos.length === 0 && expansions.length === 0) {
     return 'nothing draftable matches that choice';
   }
   if (action.picks.length !== combos.length) {
@@ -103,13 +103,13 @@ export function draftIllegalReason(state: State, action: DraftAction): string | 
   if (combos.length > STORAGE_TILE_LIMIT - player.storage.tileArea.length) {
     return 'not enough tile storage for that draft';
   }
-  if (sections.length > STORAGE_SECTION_LIMIT - player.storage.sections.length) {
-    return 'not enough section storage for that draft';
+  if (expansions.length > STORAGE_EXPANSION_LIMIT - player.storage.expansions.length) {
+    return 'not enough expansion storage for that draft';
   }
   return null;
 }
 
-// Apply a (validated) draft: move tiles + matching sections to the player, then split/reveal
+// Apply a (validated) draft: move tiles + matching expansions to the player, then split/reveal
 // the top if it dropped below 4. Does NOT advance the turn — the engine does that.
 export function resolveDraft(state: State, action: DraftAction): State {
   const rng = makeRng(state.rng);
@@ -131,24 +131,24 @@ export function resolveDraft(state: State, action: DraftAction): State {
     takenTiles.push(pick.tile);
   }
 
-  // 2. Take matching sections that were already emptied (before this draft's removals).
-  const takenSections: Section[] = [];
+  // 2. Take matching expansions that were already emptied (before this draft's removals).
+  const takenExpansions: Expansion[] = [];
   const takenIndices = new Set<number>();
   source.open.forEach((d, index) => {
-    if (d.tiles.length === 0 && d.section.identity !== null && matchesAttribute(d.section.identity, attr)) {
-      takenSections.push(d.section);
+    if (d.tiles.length === 0 && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr)) {
+      takenExpansions.push(d.expansion);
       takenIndices.add(index);
     }
   });
 
-  // 3. Rebuild the open displays (drop taken sections, keep leftover tiles).
+  // 3. Rebuild the open displays (drop taken expansions, keep leftover tiles).
   const open: Display[] = [];
   source.open.forEach((d, index) => {
-    if (!takenIndices.has(index)) open.push({ section: d.section, tiles: openTiles[index]! });
+    if (!takenIndices.has(index)) open.push({ expansion: d.expansion, tiles: openTiles[index]! });
   });
 
-  // 4. Split the top if it dropped below 4, revealing the next section with 4 fresh tiles.
-  let top: Display | null = source.top && topTiles ? { section: source.top.section, tiles: topTiles } : null;
+  // 4. Split the top if it dropped below 4, revealing the next expansion with 4 fresh tiles.
+  let top: Display | null = source.top && topTiles ? { expansion: source.top.expansion, tiles: topTiles } : null;
   const pile = [...source.pile];
   let bag = [...state.supply.bag];
   let discard = [...state.supply.discard];
@@ -156,11 +156,11 @@ export function resolveDraft(state: State, action: DraftAction): State {
   if (top !== null && top.tiles.length < 4) {
     open.push(top); // splits off, carrying its leftover tiles
     if (pile.length > 0) {
-      const nextSection = pile.shift()!;
+      const nextExpansion = pile.shift()!;
       const draw = drawTiles(bag, discard, 4, rng);
       bag = draw.bag;
       discard = draw.discard;
-      top = { section: nextSection, tiles: draw.drawn };
+      top = { expansion: nextExpansion, tiles: draw.drawn };
     } else {
       top = null;
     }
@@ -174,7 +174,7 @@ export function resolveDraft(state: State, action: DraftAction): State {
           storage: {
             ...p.storage,
             tileArea: [...p.storage.tileArea, ...takenTiles.map(tileItem)],
-            sections: [...p.storage.sections, ...takenSections],
+            expansions: [...p.storage.expansions, ...takenExpansions],
           },
         }
       : p,
@@ -184,7 +184,7 @@ export function resolveDraft(state: State, action: DraftAction): State {
     ...state,
     rng: rng.state(),
     players,
-    supply: { bag, discard, sections: state.supply.sections },
+    supply: { bag, discard, expansions: state.supply.expansions },
     central: { top, open, pile },
   };
 }
@@ -202,17 +202,17 @@ export function draftableAttributes(state: State): Attribute[] {
 }
 
 // For each distinct matching combo, the display(s) it can be taken from — the choices the UI
-// step machine walks. Plus the matching sections that would come along.
+// step machine walks. Plus the matching expansions that would come along.
 export function draftPlan(
   state: State,
   attribute: Attribute,
-): { combos: { combo: Tile; sources: DraftSource[] }[]; sections: Section[] } {
+): { combos: { combo: Tile; sources: DraftSource[] }[]; expansions: Expansion[] } {
   const all = draftableTiles(state.central);
   const combos = matchingCombos(state.central, attribute).map((combo) => ({
     combo,
     sources: all.filter((c) => sameTile(c.tile, combo)).map((c) => c.source),
   }));
-  return { combos, sections: matchingSections(state.central, attribute) };
+  return { combos, expansions: matchingExpansions(state.central, attribute) };
 }
 
 // Convenience: build a complete draft, taking each combo from its first available source.

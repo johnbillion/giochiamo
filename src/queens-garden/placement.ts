@@ -1,6 +1,6 @@
-// Placing a section or a tile: pay its cost, satisfy the shared adjacency rule, and create no
-// run with identical tiles. `place section` = drop a frame + place its identity tile; `place
-// tile` = place a tile on a placed section's empty space. Both run through the same checks.
+// Placing a expansion or a tile: pay its cost, satisfy the shared adjacency rule, and create no
+// run with identical tiles. `place expansion` = drop a frame + place its identity tile; `place
+// tile` = place a tile on a placed expansion's empty space. Both run through the same checks.
 
 import {
   coinItem,
@@ -11,10 +11,10 @@ import {
   type Direction,
   type Garden,
   type Payment,
-  type PlaceSectionAction,
+  type PlaceExpansionAction,
   type PlaceTileAction,
   type PlayerStorage,
-  type Section,
+  type Expansion,
   type SlotId,
   type State,
   type StorageItem,
@@ -25,7 +25,7 @@ import { adjacentPositions, JUNCTION_GAPS, tileAt, tileAtPosition, type TilePosi
 
 const tileKey = (t: Tile): string => `${t.colour}:${t.symbol}`;
 const posKey = (p: TilePosition): string => `${p.slot}:${p.dir}`;
-const sectionKey = (s: Section): string => (s.identity ? tileKey(s.identity) : 'blank');
+const expansionKey = (s: Expansion): string => (s.identity ? tileKey(s.identity) : 'blank');
 
 // Cost = the placed tile's symbol index, 1–6 (the SYMBOLS order is game-relevant here).
 export function symbolCost(symbol: Symbol): number {
@@ -50,15 +50,15 @@ function isMultisetSubset(needed: readonly string[], have: readonly string[]): b
 }
 
 // Why a payment is structurally invalid for placing `ref`, or null. `ref` is the placed tile
-// (for a section, its identity), which counts as 1 toward the cost.
+// (for a expansion, its identity), which counts as 1 toward the cost.
 function paymentStructureReason(ref: Tile, payment: Payment): string | null {
   const need = symbolCost(ref.symbol) - 1;
-  if (payment.tiles.length + payment.sections.length + payment.coins !== need) {
+  if (payment.tiles.length + payment.expansions.length + payment.coins !== need) {
     return `payment must total ${need}`;
   }
   const nonCoin: Tile[] = [
     ...payment.tiles,
-    ...payment.sections.flatMap((s) => (s.identity ? [s.identity] : [])),
+    ...payment.expansions.flatMap((s) => (s.identity ? [s.identity] : [])),
   ];
   if (nonCoin.length > 0) {
     const allColour = nonCoin.every((t) => t.colour === ref.colour);
@@ -79,22 +79,22 @@ function paymentStructureReason(ref: Tile, payment: Payment): string | null {
 function storageAvailableReason(
   storage: PlayerStorage,
   neededTiles: readonly Tile[],
-  neededSections: readonly Section[],
+  neededExpansions: readonly Expansion[],
   neededCoins: number,
 ): string | null {
   if (storageCoins(storage) < neededCoins) return 'not enough coins in storage';
   if (!isMultisetSubset(neededTiles.map(tileKey), storageTiles(storage).map(tileKey))) {
     return 'a required tile is not in storage';
   }
-  if (!isMultisetSubset(neededSections.map(sectionKey), storage.sections.map(sectionKey))) {
-    return 'a required section is not in storage';
+  if (!isMultisetSubset(neededExpansions.map(expansionKey), storage.expansions.map(expansionKey))) {
+    return 'a required expansion is not in storage';
   }
   return null;
 }
 
 // Every occupied position reachable from `pos` through neighbours sharing `placed`'s value on
 // `attr` — a *mono-run*: every tile the same colour (or the same symbol) as `placed`. Runs follow
-// the adjacency graph freely (rounding corners, crossing section edges), not any fixed line. No
+// the adjacency graph freely (rounding corners, crossing expansion edges), not any fixed line. No
 // depth cap is needed: a mono-run of 7+ must repeat a tile (only 6 of the other axis exist), and
 // that repeat is exactly the violation `joinsIdenticalTiles` detects.
 function monoRun(
@@ -161,14 +161,14 @@ function placeTileOn(garden: Garden, slot: SlotId, dir: Direction, tile: Tile): 
     ? [...current.tiles]
     : [null, null, null, null, null, null];
   tiles[dir] = tile;
-  return garden.map((section, i) => (i === slot ? { tiles } : section));
+  return garden.map((expansion, i) => (i === slot ? { tiles } : expansion));
 }
 
-// Remove the given tiles, coins, and sections from storage (one instance each).
+// Remove the given tiles, coins, and expansions from storage (one instance each).
 function spend(
   storage: PlayerStorage,
   removeTiles: readonly Tile[],
-  removeSections: readonly Section[],
+  removeExpansions: readonly Expansion[],
   removeCoins: number,
 ): PlayerStorage {
   const tileRemovals = new Map<string, number>();
@@ -187,18 +187,18 @@ function spend(
     else tileArea.push(item);
   }
 
-  const sectionRemovals = new Map<string, number>();
-  for (const s of removeSections) {
-    sectionRemovals.set(sectionKey(s), (sectionRemovals.get(sectionKey(s)) ?? 0) + 1);
+  const expansionRemovals = new Map<string, number>();
+  for (const s of removeExpansions) {
+    expansionRemovals.set(expansionKey(s), (expansionRemovals.get(expansionKey(s)) ?? 0) + 1);
   }
-  const sections: Section[] = [];
-  for (const s of storage.sections) {
-    const remaining = sectionRemovals.get(sectionKey(s)) ?? 0;
-    if (remaining > 0) sectionRemovals.set(sectionKey(s), remaining - 1);
-    else sections.push(s);
+  const expansions: Expansion[] = [];
+  for (const s of storage.expansions) {
+    const remaining = expansionRemovals.get(expansionKey(s)) ?? 0;
+    if (remaining > 0) expansionRemovals.set(expansionKey(s), remaining - 1);
+    else expansions.push(s);
   }
 
-  return { tileArea, sections };
+  return { tileArea, expansions };
 }
 
 // --- coin earning (completion bonuses) ---
@@ -209,12 +209,12 @@ const GAP_COIN = 2;
 
 // Coins earned by completing 6-tile regions with a tile at `pos`, given the garden *after* the
 // placement. A region pays out iff it contains `pos` and is now full — it was necessarily one
-// short before, since `pos` was empty. The placed tile's own section pays (centre 1, ring 3); each
+// short before, since `pos` was empty. The placed tile's own expansion pays (centre 1, ring 3); each
 // completed junction gap pays 2. Bonuses stack across overlapping regions.
 function regionCoins(after: Garden, pos: TilePosition): number {
   let coins = 0;
-  const section = after[pos.slot];
-  if (section && section.tiles.every((t) => t !== null)) {
+  const expansion = after[pos.slot];
+  if (expansion && expansion.tiles.every((t) => t !== null)) {
     coins += pos.slot === 0 ? CENTRE_COIN : RING_COIN;
   }
   for (const gap of JUNCTION_GAPS) {
@@ -234,7 +234,7 @@ export function placeTileCoins(state: State, action: PlaceTileAction): { max: nu
   const player = state.players[state.currentPlayer]!;
   const { tile, slot, dir, payment } = action;
   const after = placeTileOn(player.garden, slot, dir, tile);
-  const storage = spend(player.storage, [tile, ...payment.tiles], payment.sections, payment.coins);
+  const storage = spend(player.storage, [tile, ...payment.tiles], payment.expansions, payment.coins);
   const max = regionCoins(after, { slot, dir });
   const room = Math.max(0, STORAGE_TILE_LIMIT - storage.tileArea.length);
   return { max, actual: Math.min(max, room) };
@@ -244,16 +244,16 @@ export function placeTileIllegalReason(state: State, action: PlaceTileAction): s
   const player = state.players[state.currentPlayer]!;
   const { tile, slot, dir, payment } = action;
 
-  const section = player.garden[slot];
-  if (!section) return 'no section in that slot';
-  if (tileAt(section, dir) !== null) return 'that space is already occupied';
+  const expansion = player.garden[slot];
+  if (!expansion) return 'no expansion in that slot';
+  if (tileAt(expansion, dir) !== null) return 'that space is already occupied';
 
   const payReason = paymentStructureReason(tile, payment);
   if (payReason) return payReason;
   const availReason = storageAvailableReason(
     player.storage,
     [tile, ...payment.tiles],
-    payment.sections,
+    payment.expansions,
     payment.coins,
   );
   if (availReason) return availReason;
@@ -261,20 +261,20 @@ export function placeTileIllegalReason(state: State, action: PlaceTileAction): s
   return placementGeometryReason(placeTileOn(player.garden, slot, dir, tile), tile, { slot, dir });
 }
 
-export function placeSectionIllegalReason(state: State, action: PlaceSectionAction): string | null {
+export function placeExpansionIllegalReason(state: State, action: PlaceExpansionAction): string | null {
   const player = state.players[state.currentPlayer]!;
-  const { section, slot, identityDir, payment } = action;
+  const { expansion, slot, identityDir, payment } = action;
 
-  if (section.identity === null) return 'cannot place the blank starter section';
+  if (expansion.identity === null) return 'cannot place the blank starter expansion';
   if (player.garden[slot] !== null) return 'that garden slot is not empty';
-  const identity = section.identity;
+  const identity = expansion.identity;
 
   const payReason = paymentStructureReason(identity, payment);
   if (payReason) return payReason;
   const availReason = storageAvailableReason(
     player.storage,
     payment.tiles,
-    [section, ...payment.sections],
+    [expansion, ...payment.expansions],
     payment.coins,
   );
   if (availReason) return availReason;
@@ -288,7 +288,7 @@ export function resolvePlaceTile(state: State, action: PlaceTileAction): State {
   const { actual } = placeTileCoins(state, action); // coins earned, already capped to storage room
   const players = state.players.map((p, i) => {
     if (i !== state.currentPlayer) return p;
-    const spent = spend(p.storage, [tile, ...payment.tiles], payment.sections, payment.coins);
+    const spent = spend(p.storage, [tile, ...payment.tiles], payment.expansions, payment.coins);
     return {
       ...p,
       storage: {
@@ -301,21 +301,21 @@ export function resolvePlaceTile(state: State, action: PlaceTileAction): State {
   return { ...state, players, supply: discardPaymentTiles(state, payment) };
 }
 
-export function resolvePlaceSection(state: State, action: PlaceSectionAction): State {
-  const { section, slot, identityDir, payment } = action;
+export function resolvePlaceExpansion(state: State, action: PlaceExpansionAction): State {
+  const { expansion, slot, identityDir, payment } = action;
   const players = state.players.map((p, i) =>
     i === state.currentPlayer
       ? {
           ...p,
-          storage: spend(p.storage, payment.tiles, [section, ...payment.sections], payment.coins),
-          garden: placeTileOn(p.garden, slot, identityDir, section.identity!),
+          storage: spend(p.storage, payment.tiles, [expansion, ...payment.expansions], payment.coins),
+          garden: placeTileOn(p.garden, slot, identityDir, expansion.identity!),
         }
       : p,
   );
   return { ...state, players, supply: discardPaymentTiles(state, payment) };
 }
 
-// Payment tiles go to the discard pile (reshuffleable); payment sections and coins leave play.
+// Payment tiles go to the discard pile (reshuffleable); payment expansions and coins leave play.
 function discardPaymentTiles(state: State, payment: Payment): State['supply'] {
   return { ...state.supply, discard: [...state.supply.discard, ...payment.tiles] };
 }

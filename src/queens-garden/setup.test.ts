@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createInitialState, sectionsPerRound } from './engine';
+import { createInitialState, expansionsPerRound } from './engine';
 import {
   COLOURS,
   STARTING_COINS,
@@ -24,16 +24,16 @@ describe('initial deal', () => {
     expect(tilesInPlay(createInitialState(2, 1))).toBe(108);
   });
 
-  it('deals n sections into the pile by player count', () => {
+  it('deals n expansions into the pile by player count', () => {
     for (const count of [2, 3, 4] as const satisfies PlayerCount[]) {
       const s = createInitialState(count, 1);
       const inPile = (s.central.top ? 1 : 0) + s.central.pile.length;
-      expect(inPile).toBe(sectionsPerRound(count));
-      expect(inPile + s.supply.sections.length).toBe(36); // all 36 accounted for
+      expect(inPile).toBe(expansionsPerRound(count));
+      expect(inPile + s.supply.expansions.length).toBe(36); // all 36 accounted for
     }
   });
 
-  it('puts 4 tiles on the top section and nothing split off yet', () => {
+  it('puts 4 tiles on the top expansion and nothing split off yet', () => {
     const s = createInitialState(2, 1);
     expect(s.central.top?.tiles).toHaveLength(4);
     expect(s.central.open).toHaveLength(0);
@@ -50,14 +50,14 @@ describe('initial deal', () => {
     expect(createInitialState(3, 42)).not.toEqual(createInitialState(3, 43));
   });
 
-  it('every dealt section identity is a real colour+symbol combo', () => {
+  it('every dealt expansion identity is a real colour+symbol combo', () => {
     const s = createInitialState(4, 7);
-    const all = [...(s.central.top ? [s.central.top.section] : []), ...s.central.pile, ...s.supply.sections];
+    const all = [...(s.central.top ? [s.central.top.expansion] : []), ...s.central.pile, ...s.supply.expansions];
     expect(all).toHaveLength(36);
-    for (const section of all) {
-      expect(section.identity).not.toBeNull();
-      expect(COLOURS).toContain(section.identity!.colour);
-      expect(SYMBOLS).toContain(section.identity!.symbol);
+    for (const expansion of all) {
+      expect(expansion.identity).not.toBeNull();
+      expect(COLOURS).toContain(expansion.identity!.colour);
+      expect(SYMBOLS).toContain(expansion.identity!.symbol);
     }
   });
 });

@@ -132,7 +132,7 @@ describe('round transition', () => {
     expect(s1.round).toBe(2);
     expect(s1.central.top!.tiles).toHaveLength(4); // fresh top batch
     expect(s1.central.open).toHaveLength(0); // nothing split off yet
-    expect(1 + s1.central.pile.length).toBe(5); // n = 5 sections for 2 players
+    expect(1 + s1.central.pile.length).toBe(5); // n = 5 expansions for 2 players
     expect(s1.supply.discard).toHaveLength(4); // round 1's 4 top tiles were discarded
   });
 

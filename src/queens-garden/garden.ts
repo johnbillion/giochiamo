@@ -2,7 +2,7 @@
 // same play as TTT's WIN_MASKS). Slots: 0 = centre, 1–6 = ring. Directions 0–5 are the six hex
 // directions; opposite(d) = (d + 3) % 6.
 
-import type { Direction, Garden, PlacedSection, SlotId, Tile } from './types';
+import type { Direction, Garden, PlacedExpansion, SlotId, Tile } from './types';
 
 // Axial unit vectors for the six directions; opposite(d) = (d + 3) % 6.
 const DIRS = [
@@ -35,8 +35,8 @@ export function neighbourSlot(slot: SlotId, dir: Direction): SlotId | null {
 
 export type TilePosition = { readonly slot: SlotId; readonly dir: Direction };
 
-// Tiles adjacent to a position: the two ring-neighbours within the section, plus the tile across
-// the shared edge in the neighbouring section (if there is one).
+// Tiles adjacent to a position: the two ring-neighbours within the expansion, plus the tile across
+// the shared edge in the neighbouring expansion (if there is one).
 export function adjacentPositions(pos: TilePosition): TilePosition[] {
   const out: TilePosition[] = [
     { slot: pos.slot, dir: ((pos.dir + 5) % 6) as Direction },
@@ -49,31 +49,31 @@ export function adjacentPositions(pos: TilePosition): TilePosition[] {
   return out;
 }
 
-// The tile on a section's slot, if any. (The identity is just one of these tiles.)
-export function tileAt(section: PlacedSection, dir: Direction): Tile | null {
-  return section.tiles[dir] ?? null;
+// The tile on a expansion's slot, if any. (The identity is just one of these tiles.)
+export function tileAt(expansion: PlacedExpansion, dir: Direction): Tile | null {
+  return expansion.tiles[dir] ?? null;
 }
 
-// A fresh garden: the blank starter section (a frame of 6 empty slots) in the centre, ring empty.
+// A fresh garden: the blank starter expansion (a frame of 6 empty slots) in the centre, ring empty.
 export function createStarterGarden(): Garden {
-  const starter: PlacedSection = { tiles: Array.from({ length: 6 }, () => null) };
+  const starter: PlacedExpansion = { tiles: Array.from({ length: 6 }, () => null) };
   return [starter, null, null, null, null, null, null];
 }
 
 export function tileAtPosition(garden: Garden, pos: TilePosition): Tile | null {
-  const section = garden[pos.slot];
-  return section ? tileAt(section, pos.dir) : null;
+  const expansion = garden[pos.slot];
+  return expansion ? tileAt(expansion, pos.dir) : null;
 }
 
 // --- coin-scoring regions ---
 // Completing a 6-tile region with a placed tile earns coins (see placement.ts / rules.md). The
-// regions are the 7 section frames — membership is trivial (a slot's 6 dirs), "full" = no nulls —
+// regions are the 7 expansion frames — membership is trivial (a slot's 6 dirs), "full" = no nulls —
 // and the 6 "junction gaps" below. Unlike the old run `LINES`, these need only set membership, not
 // cyclic order, so no `orderCycle` is required.
 
 const DIRECTIONS: readonly Direction[] = [0, 1, 2, 3, 4, 5];
 
-// The petal pair straddling the shared edge between two adjacent sections, or null if they don't
+// The petal pair straddling the shared edge between two adjacent expansions, or null if they don't
 // touch: `a`'s petal facing `b`, and `b`'s petal facing back (dir + 3).
 function crossPair(a: SlotId, b: SlotId): readonly [TilePosition, TilePosition] | null {
   for (const d of DIRECTIONS) {
@@ -98,7 +98,7 @@ const RING_PAIRS: readonly (readonly [SlotId, SlotId])[] = [
 ];
 
 // The six junction gaps: each the set of 6 petals ringing the hole where the centre meets two
-// adjacent ring sections — 2 petals from the centre + 2 from each of the two ring sections.
+// adjacent ring expansions — 2 petals from the centre + 2 from each of the two ring expansions.
 export const JUNCTION_GAPS: readonly TilePosition[][] = RING_PAIRS.map(([a, b]) => [
   ...crossPair(0, a)!,
   ...crossPair(0, b)!,

@@ -29,10 +29,10 @@ import {
   type Attribute,
   type Direction,
   type Payment,
-  type PlaceSectionAction,
+  type PlaceExpansionAction,
   type PlaceTileAction,
   type PlayerState,
-  type Section,
+  type Expansion,
   type SlotId,
   type State,
   type Tile,
@@ -42,7 +42,7 @@ import {
   COLOUR_HEX,
   GRID_COLS,
   GRID_ROWS,
-  sectionLabel,
+  expansionLabel,
   SLOT_LAYOUT,
   SYMBOL_GLYPH,
   TileFace,
@@ -61,13 +61,13 @@ function initialSeed(): number {
 const makeSeed = (): number => Math.floor(Math.random() * 1_000_000_000);
 
 // The in-progress placement the current player is assembling. The item to place is a storage
-// index; payment is a set of *other* storage indices (tiles and coins live in one list, sections
+// index; payment is a set of *other* storage indices (tiles and coins live in one list, expansions
 // in another). Nothing here is validated by hand — it's only the raw material for an Action that
 // the engine then judges.
 type Selection =
   | { readonly mode: 'idle' }
   | { readonly mode: 'tile'; readonly idx: number } // index into the player's tileArea
-  | { readonly mode: 'section'; readonly idx: number }; // index into the player's sections
+  | { readonly mode: 'expansion'; readonly idx: number }; // index into the player's expansions
 
 const attrKey = (a: Attribute): string => (a.kind === 'colour' ? `c:${a.colour}` : `s:${a.symbol}`);
 
@@ -185,7 +185,7 @@ export function Game() {
 
   // --- assemble the current player's payment from the selected storage indices ---
   const tileArea = current.storage.tileArea;
-  const sections = current.storage.sections;
+  const expansions = current.storage.expansions;
 
   const payment: Payment = useMemo(() => {
     const tiles: Tile[] = [];
@@ -196,32 +196,32 @@ export function Game() {
       if (item.kind === 'tile') tiles.push(item.tile);
       else coins += 1;
     }
-    const paySections: Section[] = [];
+    const payExpansions: Expansion[] = [];
     for (const i of paySecs) {
-      const s = sections[i];
-      if (s) paySections.push(s);
+      const s = expansions[i];
+      if (s) payExpansions.push(s);
     }
-    return { tiles, sections: paySections, coins: Math.min(coins, 5) as Payment['coins'] };
-  }, [payTiles, paySecs, tileArea, sections]);
+    return { tiles, expansions: payExpansions, coins: Math.min(coins, 5) as Payment['coins'] };
+  }, [payTiles, paySecs, tileArea, expansions]);
 
-  // The item being placed (a tile, or a section's identity tile) drives the cost display.
+  // The item being placed (a tile, or a expansion's identity tile) drives the cost display.
   const placedItem = sel.mode === 'tile' ? tileArea[sel.idx] : undefined;
   const placedTile: Tile | null =
     placedItem && placedItem.kind === 'tile' ? placedItem.tile : null;
-  const placedSection: Section | null = sel.mode === 'section' ? (sections[sel.idx] ?? null) : null;
-  const placedRef: Tile | null = placedTile ?? placedSection?.identity ?? null;
+  const placedExpansion: Expansion | null = sel.mode === 'expansion' ? (expansions[sel.idx] ?? null) : null;
+  const placedRef: Tile | null = placedTile ?? placedExpansion?.identity ?? null;
   const cost = placedRef ? symbolCost(placedRef.symbol) : 0;
   const need = Math.max(0, cost - 1);
-  const paid = payment.tiles.length + payment.sections.length + payment.coins;
+  const paid = payment.tiles.length + payment.expansions.length + payment.coins;
 
   // Build the candidate Action for placing the selected item at (slot, dir) with the chosen
   // payment. Returns null if nothing is selected.
-  const candidateAt = (slot: SlotId, dir: Direction): PlaceTileAction | PlaceSectionAction | null => {
+  const candidateAt = (slot: SlotId, dir: Direction): PlaceTileAction | PlaceExpansionAction | null => {
     if (sel.mode === 'tile' && placedTile) {
       return { type: ActionType.PlaceTile, tile: placedTile, slot, dir, payment };
     }
-    if (sel.mode === 'section' && placedSection) {
-      return { type: ActionType.PlaceSection, section: placedSection, slot, identityDir: dir, payment };
+    if (sel.mode === 'expansion' && placedExpansion) {
+      return { type: ActionType.PlaceExpansion, expansion: placedExpansion, slot, identityDir: dir, payment };
     }
     return null;
   };
@@ -268,18 +268,18 @@ export function Game() {
     setPayTiles((p) => toggle(p, i));
   };
 
-  const clickSectionItem = (i: number) => {
-    if (!sections[i]) return;
+  const clickExpansionItem = (i: number) => {
+    if (!expansions[i]) return;
     if (sel.mode === 'idle') {
-      if (available.includes(ActionType.PlaceSection)) {
-        setSel({ mode: 'section', idx: i });
+      if (available.includes(ActionType.PlaceExpansion)) {
+        setSel({ mode: 'expansion', idx: i });
         setPayTiles(new Set());
         setPaySecs(new Set());
         setNote(null);
       }
       return;
     }
-    if (sel.mode === 'section' && sel.idx === i) {
+    if (sel.mode === 'expansion' && sel.idx === i) {
       resetSelection();
       return;
     }
@@ -387,7 +387,7 @@ export function Game() {
         <section className="actionbar">
           {sel.mode === 'idle' ? (
             <span className="hint">
-              Click a stored tile or section to start placing it, draft above, or pass.
+              Click a stored tile or expansion to start placing it, draft above, or pass.
             </span>
           ) : (
             <span className="placing">
@@ -395,7 +395,7 @@ export function Game() {
               {placedTile ? (
                 <TileFace tile={placedTile} size={22} />
               ) : (
-                placedSection && <em>{sectionLabel(placedSection)} section</em>
+                placedExpansion && <em>{expansionLabel(placedExpansion)} expansion</em>
               )}{' '}
               — cost {cost}: pay {need} more ({paid}/{need} selected). Then click a highlighted
               cell.{' '}
@@ -426,7 +426,7 @@ export function Game() {
             paySecs={paySecs}
             legalTargets={i === state.currentPlayer ? legalTargets : new Set()}
             onTileItem={clickTileItem}
-            onSectionItem={clickSectionItem}
+            onExpansionItem={clickExpansionItem}
             onCell={clickCell}
           />
         ))}
@@ -468,14 +468,14 @@ function CentralArea({ state }: { state: State }) {
         <div className="display" key={i}>
           <span className="display-label">
             Open {i + 1}
-            {d.tiles.length === 0 && d.section.identity
-              ? ` — ${sectionLabel(d.section)} section (takeable)`
+            {d.tiles.length === 0 && d.expansion.identity
+              ? ` — ${expansionLabel(d.expansion)} expansion (takeable)`
               : ''}
           </span>
           <div className="tiles">
             {d.tiles.length
               ? d.tiles.map((t, j) => <TileFace key={j} tile={t} size={28} />)
-              : <em>{d.section.identity ? sectionLabel(d.section) : 'starter'} section</em>}
+              : <em>{d.expansion.identity ? expansionLabel(d.expansion) : 'starter'} expansion</em>}
           </div>
         </div>
       ))}
@@ -493,7 +493,7 @@ function PlayerPanel({
   paySecs,
   legalTargets,
   onTileItem,
-  onSectionItem,
+  onExpansionItem,
   onCell,
 }: {
   id: number;
@@ -504,7 +504,7 @@ function PlayerPanel({
   paySecs: ReadonlySet<number>;
   legalTargets: ReadonlySet<string>;
   onTileItem: (i: number) => void;
-  onSectionItem: (i: number) => void;
+  onExpansionItem: (i: number) => void;
   onCell: (slot: SlotId, dir: Direction) => void;
 }) {
   const tiles = storageTiles(player.storage);
@@ -516,7 +516,7 @@ function PlayerPanel({
       </h2>
       <div className="score">
         Score {player.score} · {storageCoins(player.storage)} coins · {tiles.length} tiles ·{' '}
-        {player.storage.sections.length} sections
+        {player.storage.expansions.length} expansions
       </div>
 
       <Garden
@@ -558,15 +558,15 @@ function PlayerPanel({
           </div>
         </div>
         <div className="storage-row">
-          <span className="storage-label">Sections</span>
+          <span className="storage-label">Expansions</span>
           <div className="items">
-            {player.storage.sections.length === 0 && <em>empty</em>}
-            {player.storage.sections.map((s, i) => {
-              const isPlaced = active && sel.mode === 'section' && sel.idx === i;
+            {player.storage.expansions.length === 0 && <em>empty</em>}
+            {player.storage.expansions.map((s, i) => {
+              const isPlaced = active && sel.mode === 'expansion' && sel.idx === i;
               const isPay = active && paySecs.has(i);
-              const cls = `item section${isPlaced ? ' placed' : ''}${isPay ? ' pay' : ''}`;
+              const cls = `item expansion${isPlaced ? ' placed' : ''}${isPay ? ' pay' : ''}`;
               return (
-                <button key={i} className={cls} disabled={!active} onClick={() => onSectionItem(i)}>
+                <button key={i} className={cls} disabled={!active} onClick={() => onExpansionItem(i)}>
                   {s.identity ? <TileFace tile={s.identity} size={30} /> : <em>blank</em>}
                 </button>
               );
@@ -593,14 +593,14 @@ function Garden({
 }) {
   const cells: ReactNode[] = [];
   SLOT_LAYOUT.forEach((dirs, slot) => {
-    const section = player.garden[slot];
+    const expansion = player.garden[slot];
     dirs.forEach(([row, col], dir) => {
-      const tile = section ? section.tiles[dir] ?? null : null;
+      const tile = expansion ? expansion.tiles[dir] ?? null : null;
       const isLegalTarget = active && placing && legalTargets.has(`${slot}:${dir}`);
-      const empty = section ? !tile : false;
+      const empty = expansion ? !tile : false;
       const cls = [
         'cell',
-        section ? (tile ? 'filled' : 'empty-space') : 'no-section',
+        expansion ? (tile ? 'filled' : 'empty-space') : 'no-expansion',
         isLegalTarget ? 'legal' : '',
       ]
         .filter(Boolean)
@@ -612,7 +612,7 @@ function Garden({
           style={{ gridRow: row, gridColumn: col }}
           disabled={!isLegalTarget}
           onClick={() => isLegalTarget && onCell(slot as SlotId, dir as Direction)}
-          title={section ? (tile ? undefined : `slot ${slot}, dir ${dir}`) : `empty slot ${slot}`}
+          title={expansion ? (tile ? undefined : `slot ${slot}, dir ${dir}`) : `empty slot ${slot}`}
         >
           {tile ? <TileFace tile={tile} size={30} /> : empty ? '·' : ''}
         </button>,

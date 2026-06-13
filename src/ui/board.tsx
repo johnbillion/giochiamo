@@ -1,8 +1,8 @@
 // Presentation-only helpers for the Queen's Garden UI. No game logic lives here — that all
 // stays in the engine (`src/queens-garden`). This file just maps the engine's abstract
-// colours/symbols to pixels and lays the 7 hex sections out on a grid.
+// colours/symbols to pixels and lays the 7 hex expansions out on a grid.
 
-import type { Colour, Section, Symbol, Tile } from '../queens-garden/types';
+import type { Colour, Expansion, Symbol, Tile } from '../queens-garden/types';
 
 // The 6 colours → CSS fills. (The engine's colour names are arbitrary labels; these are ours.)
 export const COLOUR_HEX: Record<Colour, string> = {
@@ -26,7 +26,7 @@ export const SYMBOL_GLYPH: Record<Symbol, string> = {
 
 // Grid position [grid-row, grid-column] of every tile slot, indexed [slot][dir]. Lifted from
 // the playground's ASCII layout (which was derived from the true board geometry), so the picture
-// mirrors real adjacency: the centre section in the middle, the six ring sections around it.
+// mirrors real adjacency: the centre expansion in the middle, the six ring expansions around it.
 export const SLOT_LAYOUT: readonly (readonly (readonly [number, number])[])[] = [
   [[8, 5], [7, 4], [6, 4], [5, 5], [6, 6], [7, 6]], // slot 0 (centre)
   [[12, 5], [11, 4], [10, 4], [9, 5], [10, 6], [11, 6]], // slot 1
@@ -44,8 +44,8 @@ export function tileLabel(tile: Tile): string {
   return `${tile.colour} ${tile.symbol}`;
 }
 
-export function sectionLabel(section: Section): string {
-  return section.identity ? `${section.identity.colour} ${section.identity.symbol}` : 'blank';
+export function expansionLabel(expansion: Expansion): string {
+  return expansion.identity ? `${expansion.identity.colour} ${expansion.identity.symbol}` : 'blank';
 }
 
 // A single tile face: a coloured square with its symbol glyph. `size` is the side length in px.

@@ -20,7 +20,7 @@ import {
   type PlayerCount,
   type PlayerState,
   type ReorderAction,
-  type Section,
+  type Expansion,
   type State,
   type StorageItem,
   type Supply,
@@ -31,9 +31,9 @@ import { drawTiles } from './supply';
 import { draftableAttributes, draftIllegalReason, resolveDraft } from './draft';
 import { createStarterGarden } from './garden';
 import {
-  placeSectionIllegalReason,
+  placeExpansionIllegalReason,
   placeTileIllegalReason,
-  resolvePlaceSection,
+  resolvePlaceExpansion,
   resolvePlaceTile,
 } from './placement';
 
@@ -50,19 +50,19 @@ function buildTileBag(): Tile[] {
   return tiles;
 }
 
-// The 36-section pool: one section per colour×symbol combo (its immovable identity tile).
-function buildSectionPool(): Section[] {
-  const sections: Section[] = [];
+// The 36-expansion pool: one expansion per colour×symbol combo (its immovable identity tile).
+function buildExpansionPool(): Expansion[] {
+  const expansions: Expansion[] = [];
   for (const colour of COLOURS) {
     for (const symbol of SYMBOLS) {
-      sections.push({ identity: { colour, symbol } });
+      expansions.push({ identity: { colour, symbol } });
     }
   }
-  return sections;
+  return expansions;
 }
 
-// Sections in play per round.
-export function sectionsPerRound(playerCount: PlayerCount): number {
+// Expansions in play per round.
+export function expansionsPerRound(playerCount: PlayerCount): number {
   return {
     2: 5,
     3: 7,
@@ -70,21 +70,21 @@ export function sectionsPerRound(playerCount: PlayerCount): number {
   }[playerCount];
 }
 
-// Deal a round's central area from the supply: n sections into a pile, 4 tiles onto the top.
+// Deal a round's central area from the supply: n expansions into a pile, 4 tiles onto the top.
 // Used at setup and at every round transition.
 function dealRound(
   supply: Supply,
   rng: Rng,
   playerCount: PlayerCount,
 ): { central: CentralArea; supply: Supply } {
-  const n = sectionsPerRound(playerCount);
-  const roundSections = supply.sections.slice(0, n);
+  const n = expansionsPerRound(playerCount);
+  const roundExpansions = supply.expansions.slice(0, n);
   const draw = drawTiles(supply.bag, supply.discard, 4, rng);
-  const top: Display = { section: roundSections[0]!, tiles: draw.drawn };
-  const central: CentralArea = { top, open: [], pile: roundSections.slice(1) };
+  const top: Display = { expansion: roundExpansions[0]!, tiles: draw.drawn };
+  const central: CentralArea = { top, open: [], pile: roundExpansions.slice(1) };
   return {
     central,
-    supply: { bag: draw.bag, discard: draw.discard, sections: supply.sections.slice(n) },
+    supply: { bag: draw.bag, discard: draw.discard, expansions: supply.expansions.slice(n) },
   };
 }
 
@@ -98,14 +98,14 @@ export function createInitialState(
   const fullSupply: Supply = {
     bag: rng.shuffle(buildTileBag()),
     discard: [],
-    sections: rng.shuffle(buildSectionPool()),
+    expansions: rng.shuffle(buildExpansionPool()),
   };
   const { central, supply } = dealRound(fullSupply, rng, playerCount);
 
   const players: PlayerState[] = Array.from({ length: playerCount }, () => ({
     passed: false,
     score: 0,
-    storage: { tileArea: Array.from({ length: STARTING_COINS }, () => coinItem), sections: [] },
+    storage: { tileArea: Array.from({ length: STARTING_COINS }, () => coinItem), expansions: [] },
     garden: createStarterGarden(),
   }));
 
@@ -135,8 +135,8 @@ export function illegalReason(state: State, action: Action): string | null {
       return draftIllegalReason(state, action);
     case ActionType.Reorder:
       return reorderIllegalReason(state, action);
-    case ActionType.PlaceSection:
-      return placeSectionIllegalReason(state, action);
+    case ActionType.PlaceExpansion:
+      return placeExpansionIllegalReason(state, action);
     case ActionType.PlaceTile:
       return placeTileIllegalReason(state, action);
     case ActionType.Pass:
@@ -159,7 +159,7 @@ export function availableActionTypes(state: State): ActionType[] {
   if (draftableAttributes(state).length > 0) kinds.unshift(ActionType.Draft);
   // Necessary conditions only — you can only place what you hold. Whether a legal target +
   // affordable payment exists is left to illegalReason on a concrete action.
-  if (player.storage.sections.length > 0) kinds.push(ActionType.PlaceSection);
+  if (player.storage.expansions.length > 0) kinds.push(ActionType.PlaceExpansion);
   if (storageTiles(player.storage).length > 0) kinds.push(ActionType.PlaceTile);
   return kinds;
 }
@@ -178,8 +178,8 @@ export function applyAction(state: State, action: Action): State {
       return resolveReorder(state, action);
     case ActionType.Pass:
       return resolvePass(state);
-    case ActionType.PlaceSection:
-      return advanceTurn(resolvePlaceSection(state, action));
+    case ActionType.PlaceExpansion:
+      return advanceTurn(resolvePlaceExpansion(state, action));
     case ActionType.PlaceTile:
       return advanceTurn(resolvePlaceTile(state, action));
   }
@@ -263,8 +263,8 @@ function storageItemKey(item: StorageItem): string {
   return item.kind === 'coin' ? 'coin' : `tile:${item.tile.colour}:${item.tile.symbol}`;
 }
 
-function sectionKey(section: Section): string {
-  return section.identity ? `${section.identity.colour}:${section.identity.symbol}` : 'blank';
+function expansionKey(expansion: Expansion): string {
+  return expansion.identity ? `${expansion.identity.colour}:${expansion.identity.symbol}` : 'blank';
 }
 
 function reorderIllegalReason(state: State, action: ReorderAction): string | null {
@@ -272,7 +272,7 @@ function reorderIllegalReason(state: State, action: ReorderAction): string | nul
   const ok =
     action.area === 'tiles'
       ? isPermutation(storage.tileArea, action.order, storageItemKey)
-      : isPermutation(storage.sections, action.order, sectionKey);
+      : isPermutation(storage.expansions, action.order, expansionKey);
   return ok ? null : `a reorder must be a permutation of your ${action.area}`;
 }
 
@@ -282,7 +282,7 @@ function resolveReorder(state: State, action: ReorderAction): State {
     const storage =
       action.area === 'tiles'
         ? { ...p.storage, tileArea: action.order }
-        : { ...p.storage, sections: action.order };
+        : { ...p.storage, expansions: action.order };
     return { ...p, storage };
   });
   return { ...state, players };

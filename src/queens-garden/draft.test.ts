@@ -14,7 +14,7 @@ import {
   type Colour,
   type Display,
   type PlayerState,
-  type Section,
+  type Expansion,
   type State,
   type StorageItem,
   type Symbol,
@@ -25,7 +25,7 @@ const tile = (colour: Colour, symbol: Symbol): Tile => ({ colour, symbol });
 const emptyPlayer = (): PlayerState => ({
   passed: false,
   score: 0,
-  storage: { tileArea: [], sections: [] },
+  storage: { tileArea: [], expansions: [] },
   garden: createStarterGarden(),
 });
 
@@ -36,7 +36,7 @@ function makeState(central: CentralArea, opts: { bag?: Tile[]; players?: PlayerS
     players: opts.players ?? [emptyPlayer(), emptyPlayer()],
     currentPlayer: 0,
     firstPasser: null,
-    supply: { bag: opts.bag ?? [], discard: [], sections: [] },
+    supply: { bag: opts.bag ?? [], discard: [], expansions: [] },
     central,
   };
 }
@@ -49,11 +49,11 @@ function totalTiles(s: State): number {
 }
 
 describe('draft — taking tiles', () => {
-  it('takes one of each distinct matching colour and reveals the next section when the top drops below 4', () => {
+  it('takes one of each distinct matching colour and reveals the next expansion when the top drops below 4', () => {
     const s0 = makeState(
       {
         top: {
-          section: { identity: tile('blue', 'acorn') },
+          expansion: { identity: tile('blue', 'acorn') },
           tiles: [tile('red', 'bird'), tile('red', 'flower'), tile('blue', 'bird'), tile('green', 'leaf')],
         },
         open: [],
@@ -67,19 +67,19 @@ describe('draft — taking tiles', () => {
     expect(storageTiles(s1.players[0]!.storage)).toHaveLength(2); // the two distinct reds
     expect(s1.central.open).toHaveLength(1); // old top split off…
     expect(s1.central.open[0]!.tiles).toHaveLength(2); // …carrying its two leftovers
-    expect(s1.central.top!.section.identity).toEqual(tile('orange', 'clover')); // next revealed
+    expect(s1.central.top!.expansion.identity).toEqual(tile('orange', 'clover')); // next revealed
     expect(s1.central.top!.tiles).toHaveLength(4); // with a fresh batch
     expect(totalTiles(s1)).toBe(totalTiles(s0)); // conserved
   });
 
   it('leaves the top intact when the drafted tile lives only in an open display', () => {
     const top: Display = {
-      section: { identity: tile('blue', 'acorn') },
+      expansion: { identity: tile('blue', 'acorn') },
       tiles: [tile('blue', 'bird'), tile('blue', 'flower'), tile('green', 'leaf'), tile('green', 'bird')],
     };
     const s0 = makeState({
       top,
-      open: [{ section: { identity: tile('pink', 'clover') }, tiles: [tile('red', 'bird')] }],
+      open: [{ expansion: { identity: tile('pink', 'clover') }, tiles: [tile('red', 'bird')] }],
       pile: [],
     });
 
@@ -92,12 +92,12 @@ describe('draft — taking tiles', () => {
 
   it('honours which copy the player takes (the source choice)', () => {
     const top: Display = {
-      section: { identity: tile('blue', 'acorn') },
+      expansion: { identity: tile('blue', 'acorn') },
       tiles: [tile('red', 'bird'), tile('blue', 'flower'), tile('green', 'leaf'), tile('pink', 'bird')],
     };
     const central: CentralArea = {
       top,
-      open: [{ section: { identity: tile('green', 'clover') }, tiles: [tile('red', 'bird')] }],
+      open: [{ expansion: { identity: tile('green', 'clover') }, tiles: [tile('red', 'bird')] }],
       pile: [],
     };
     const s0 = makeState(central);
@@ -116,22 +116,22 @@ describe('draft — taking tiles', () => {
   });
 });
 
-describe('draft — taking sections', () => {
-  it('takes matching already-emptied sections into storage', () => {
+describe('draft — taking expansions', () => {
+  it('takes matching already-emptied expansions into storage', () => {
     const s0 = makeState({
       top: {
-        section: { identity: tile('blue', 'acorn') },
+        expansion: { identity: tile('blue', 'acorn') },
         tiles: [tile('blue', 'bird'), tile('green', 'flower'), tile('green', 'leaf'), tile('pink', 'bird')],
       },
-      open: [{ section: { identity: tile('red', 'flower') }, tiles: [] }], // emptied, takeable
+      open: [{ expansion: { identity: tile('red', 'flower') }, tiles: [] }], // emptied, takeable
       pile: [],
     });
 
     const s1 = applyAction(s0, buildDraft(s0, { kind: 'colour', colour: 'red' }));
 
-    expect(s1.players[0]!.storage.sections).toEqual([{ identity: tile('red', 'flower') }]);
+    expect(s1.players[0]!.storage.expansions).toEqual([{ identity: tile('red', 'flower') }]);
     expect(storageTiles(s1.players[0]!.storage)).toHaveLength(0);
-    expect(s1.central.open).toHaveLength(0); // the section was taken
+    expect(s1.central.open).toHaveLength(0); // the expansion was taken
   });
 });
 
@@ -142,14 +142,14 @@ describe('draft — legality', () => {
       score: 0,
       storage: {
         tileArea: Array.from({ length: STORAGE_TILE_LIMIT - 1 }, () => tileItem(tile('blue', 'bird'))),
-        sections: [],
+        expansions: [],
       },
       garden: createStarterGarden(),
     };
     const s0 = makeState(
       {
         top: {
-          section: { identity: tile('green', 'acorn') },
+          expansion: { identity: tile('green', 'acorn') },
           tiles: [tile('red', 'bird'), tile('red', 'flower'), tile('green', 'leaf'), tile('green', 'bird')],
         },
         open: [],
@@ -170,14 +170,14 @@ describe('draft — legality', () => {
       score: 0,
       storage: {
         tileArea: [...Array.from({ length: 10 }, () => tileItem(tile('blue', 'bird'))), coinItem],
-        sections: [],
+        expansions: [],
       },
       garden: createStarterGarden(),
     };
     const s0 = makeState(
       {
         top: {
-          section: { identity: tile('green', 'acorn') },
+          expansion: { identity: tile('green', 'acorn') },
           tiles: [tile('red', 'bird'), tile('red', 'flower'), tile('green', 'leaf'), tile('green', 'bird')],
         },
         open: [],
@@ -192,7 +192,7 @@ describe('draft — legality', () => {
   it('is illegal to draft an attribute nothing matches', () => {
     const s0 = makeState({
       top: {
-        section: { identity: tile('blue', 'acorn') },
+        expansion: { identity: tile('blue', 'acorn') },
         tiles: [tile('blue', 'bird'), tile('green', 'flower'), tile('green', 'leaf'), tile('pink', 'bird')],
       },
       open: [],
@@ -206,7 +206,7 @@ describe('draft — legality', () => {
 describe('reorder — rearranging storage', () => {
   it("permutes the current player's tile area without advancing the turn", () => {
     const items: StorageItem[] = [tileItem(tile('red', 'bird')), coinItem, tileItem(tile('blue', 'leaf'))];
-    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: items, sections: [] }, garden: createStarterGarden() };
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: items, expansions: [] }, garden: createStarterGarden() };
     const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
 
     const order: StorageItem[] = [items[2]!, items[0]!, items[1]!];
@@ -216,20 +216,20 @@ describe('reorder — rearranging storage', () => {
     expect(s1.currentPlayer).toBe(0); // free action — the turn did not pass
   });
 
-  it('permutes the section storage too', () => {
-    const a: Section = { identity: tile('red', 'bird') };
-    const b: Section = { identity: tile('blue', 'leaf') };
-    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [], sections: [a, b] }, garden: createStarterGarden() };
+  it('permutes the expansion storage too', () => {
+    const a: Expansion = { identity: tile('red', 'bird') };
+    const b: Expansion = { identity: tile('blue', 'leaf') };
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [], expansions: [a, b] }, garden: createStarterGarden() };
     const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
 
-    const s1 = applyAction(s0, { type: ActionType.Reorder, area: 'sections', order: [b, a] });
+    const s1 = applyAction(s0, { type: ActionType.Reorder, area: 'expansions', order: [b, a] });
 
-    expect(s1.players[0]!.storage.sections).toEqual([b, a]);
+    expect(s1.players[0]!.storage.expansions).toEqual([b, a]);
     expect(s1.currentPlayer).toBe(0);
   });
 
   it('rejects an order that is not a permutation of the area', () => {
-    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [coinItem], sections: [] }, garden: createStarterGarden() };
+    const p: PlayerState = { passed: false, score: 0, storage: { tileArea: [coinItem], expansions: [] }, garden: createStarterGarden() };
     const s0 = makeState({ top: null, open: [], pile: [] }, { players: [p, emptyPlayer()] });
 
     const bogus: Action = { type: ActionType.Reorder, area: 'tiles', order: [tileItem(tile('red', 'bird'))] };
