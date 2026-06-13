@@ -96,23 +96,28 @@ button:disabled {
   gap: 12px;
   align-items: flex-start;
 }
+/* Each pile is framed by an expansion-rosette outline, with its tiles centred inside. */
 .display {
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  padding: 6px 8px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  min-height: 150px;
 }
-.display-label {
-  display: block;
-  font-size: 0.75rem;
-  color: #64748b;
-  margin-bottom: 4px;
+.expansion-outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 .tiles {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, max-content);
   gap: 4px;
-  justify-content: start;
-  min-height: 30px;
+  place-content: center;
+  z-index: 1;
 }
 
 /* An emptied slot where a tile was drafted away — holds its place in the 2×2 grid. */

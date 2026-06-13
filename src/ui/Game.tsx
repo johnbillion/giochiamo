@@ -56,6 +56,7 @@ import {
   DIR_AXIAL,
   expansionLabel,
   ExpansionFace,
+  ExpansionOutline,
   hexPoints,
   SLOT_CENTRE,
   SYMBOL_GLYPH,
@@ -407,6 +408,8 @@ export function Game() {
             sel={sel}
             payTiles={payTiles}
             paySecs={paySecs}
+            placedTile={i === state.currentPlayer ? placedTile : null}
+            placedExpansion={i === state.currentPlayer ? placedExpansion : null}
             legalTargets={i === state.currentPlayer ? legalTargets : new Set()}
             onTileItem={clickTileItem}
             onExpansionItem={clickExpansionItem}
@@ -641,7 +644,7 @@ function CentralArea({
   return (
     <div className="displays" style={{ '--displays': maxPiles } as CSSProperties}>
       <div className="display">
-        <span className="display-label">Top ({central.pile.length} face-down)</span>
+        <ExpansionOutline />
         <div className="tiles">
           {central.top
             ? central.top.tiles.map((t, i) => renderTile(t, i))
@@ -650,12 +653,7 @@ function CentralArea({
       </div>
       {central.open.map((d, i) => (
         <div className="display" key={i}>
-          <span className="display-label">
-            Open {i + 1}
-            {!d.tiles.some(Boolean) && d.expansion.identity
-              ? ` — ${expansionLabel(d.expansion)} expansion (takeable)`
-              : ''}
-          </span>
+          <ExpansionOutline />
           <div className="tiles">
             {d.tiles.some(Boolean)
               ? d.tiles.map((t, j) => renderTile(t, j))
@@ -674,6 +672,8 @@ function PlayerPanel({
   sel,
   payTiles,
   paySecs,
+  placedTile,
+  placedExpansion,
   legalTargets,
   onTileItem,
   onExpansionItem,
@@ -685,6 +685,8 @@ function PlayerPanel({
   sel: Selection;
   payTiles: ReadonlySet<number>;
   paySecs: ReadonlySet<number>;
+  placedTile: Tile | null;
+  placedExpansion: Expansion | null;
   legalTargets: ReadonlySet<string>;
   onTileItem: (i: number) => void;
   onExpansionItem: (i: number) => void;
@@ -706,7 +708,8 @@ function PlayerPanel({
         player={player}
         active={active}
         legalTargets={legalTargets}
-        placing={sel.mode !== 'idle'}
+        placedTile={placedTile}
+        placedExpansion={placedExpansion}
         onCell={onCell}
       />
 
@@ -764,16 +767,25 @@ function Garden({
   player,
   active,
   legalTargets,
-  placing,
+  placedTile,
+  placedExpansion,
   onCell,
 }: {
   player: PlayerState;
   active: boolean;
   legalTargets: ReadonlySet<string>;
-  placing: boolean;
+  // What the current player is about to place (drives the hover preview). Exactly one is non-null
+  // while a placement is in progress; both null when idle.
+  placedTile: Tile | null;
+  placedExpansion: Expansion | null;
   onCell: (slot: SlotId, dir: Direction) => void;
 }) {
   const R = 18; // hex circumradius in px
+  const placing = placedTile !== null || placedExpansion !== null;
+
+  // The (slot, dir) cell the cursor is over, as a "slot:dir" key. Only legal cells set it, so a
+  // non-null value always names a cell the engine would accept — the basis for the live preview.
+  const [hovered, setHovered] = useState<string | null>(null);
 
   // Project every (slot, dir) tile slot to a pixel centre and capture its state, tracking the
   // bounding box so the SVG viewBox hugs the whole flower-of-flowers.
@@ -817,18 +829,59 @@ function Garden({
   const height = maxY - minY + 2 * padY;
   const viewBox = `${(minX - padX).toFixed(2)} ${(minY - padY).toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)}`;
 
+  // The hovered cell, if the cursor is over a legal target. For a tile placement this is the single
+  // cell the tile lands in; for an expansion it's where the identity tile faces, and the whole
+  // rosette (its slot) gets highlighted.
+  const hoveredCell = hovered ? cells.find((c) => `${c.slot}:${c.dir}` === hovered && c.legal) : undefined;
+
   return (
     <svg className="garden" viewBox={viewBox} aria-label="garden board">
       {cells.map((c) => {
+        const key = `${c.slot}:${c.dir}`;
+        // Where the about-to-place item would land: the exact cell under the cursor, and — for an
+        // expansion — every cell of that rosette's slot.
+        const isPreviewCell = hoveredCell?.slot === c.slot && hoveredCell?.dir === c.dir;
+        const inHoveredRosette = !!placedExpansion && !!hoveredCell && hoveredCell.slot === c.slot;
+
+        // The tile to draw in this cell as a preview: the placed tile, or the expansion's identity
+        // (which faces the hovered direction). A blank-identity expansion previews no glyph.
+        const preview: Tile | null = isPreviewCell
+          ? placedTile ?? placedExpansion?.identity ?? null
+          : null;
+
         // Fill/stroke mirror the old cell states: legal target, empty slot of a placed expansion,
-        // an unplaced expansion slot, or a filled tile.
+        // an unplaced expansion slot, or a filled tile — with the hover preview layered on top.
         let fill: string;
         let stroke: string;
         let strokeWidth = 1.5;
-        if (c.legal) {
+        let glyph: string | null = c.tile ? SYMBOL_GLYPH[c.tile.symbol] : null;
+        let className = 'gcell';
+        if (preview) {
+          // Show the actual tile/identity that will be placed here.
+          fill = COLOUR_HEX[preview.colour];
+          stroke = '#15803d';
+          strokeWidth = 2.5;
+          glyph = SYMBOL_GLYPH[preview.symbol];
+          className = 'gcell legal';
+        } else if (isPreviewCell) {
+          // Hovered cell of a blank-identity expansion: an empty-frame preview, no glyph.
+          fill = '#a5b4fc';
+          stroke = '#15803d';
+          strokeWidth = 2.5;
+          className = 'gcell legal';
+        } else if (inHoveredRosette) {
+          // The rest of the rosette the expansion is about to drop into — drawn in the same
+          // purpley-blue an empty slot of a placed expansion takes, so the hover previews the
+          // placed result.
+          fill = '#a5b4fc';
+          stroke = '#15803d';
+          strokeWidth = 2;
+          className = c.legal ? 'gcell legal' : 'gcell';
+        } else if (c.legal) {
           fill = '#86efac';
           stroke = '#15803d';
           strokeWidth = 2.5;
+          className = 'gcell legal';
         } else if (!c.hasExpansion) {
           fill = '#cbd5e1';
           stroke = '#94a3b8';
@@ -841,9 +894,11 @@ function Garden({
         }
         return (
           <g
-            key={`${c.slot}:${c.dir}`}
-            className={c.legal ? 'gcell legal' : 'gcell'}
+            key={key}
+            className={className}
             onClick={c.legal ? () => onCell(c.slot as SlotId, c.dir as Direction) : undefined}
+            onMouseEnter={c.legal ? () => setHovered(key) : undefined}
+            onMouseLeave={c.legal ? () => setHovered((h) => (h === key ? null : h)) : undefined}
           >
             <polygon
               points={hexPoints(c.cx, c.cy, R)}
@@ -851,7 +906,7 @@ function Garden({
               stroke={stroke}
               strokeWidth={strokeWidth}
             />
-            {c.tile && (
+            {glyph && (
               <text
                 className="gglyph"
                 x={c.cx}
@@ -860,7 +915,7 @@ function Garden({
                 dominantBaseline="central"
                 fontSize={R}
               >
-                {SYMBOL_GLYPH[c.tile.symbol]}
+                {glyph}
               </text>
             )}
           </g>

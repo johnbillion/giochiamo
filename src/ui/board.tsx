@@ -89,6 +89,44 @@ export function hexPoints(cx: number, cy: number, R: number): string {
   return corners.join(' ');
 }
 
+// The outer silhouette of an expansion rosette — the union of the six hexes with no internal
+// borders — as an 18-gon. Used as a decorative frame behind a central pile's tiles. The shape is
+// 6-fold symmetric: six "tip" pairs with a shallow valley between each pair.
+const EXPANSION_OUTLINE_POINTS = (() => {
+  const s = Math.sqrt(3);
+  // Walks the boundary clockwise: each hex contributes three outer vertices, meeting at a valley.
+  return [
+    [s, -1], [1.5 * s, -0.5], [1.5 * s, 0.5], [s, 1], // right hex
+    [s, 2], [0.5 * s, 2.5], [0, 2], //                   lower-right hex
+    [-0.5 * s, 2.5], [-s, 2], [-s, 1], //                lower-left hex
+    [-1.5 * s, 0.5], [-1.5 * s, -0.5], [-s, -1], //      left hex
+    [-s, -2], [-0.5 * s, -2.5], [0, -2], //              upper-left hex
+    [0.5 * s, -2.5], [s, -2], //                         upper-right hex
+  ] as const;
+})();
+
+// A standalone SVG of the expansion-rosette outline, scaled to fill (and centre within) its box.
+export function ExpansionOutline() {
+  const R = 10;
+  const s = Math.sqrt(3);
+  const pad = 2;
+  const points = EXPANSION_OUTLINE_POINTS.map(([x, y]) => `${(x * R).toFixed(2)},${(y * R).toFixed(2)}`).join(' ');
+  const minX = -1.5 * s * R - pad;
+  const minY = -2.5 * R - pad;
+  const w = 3 * s * R + 2 * pad;
+  const h = 5 * R + 2 * pad;
+  return (
+    <svg
+      className="expansion-outline"
+      viewBox={`${minX.toFixed(2)} ${minY.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`}
+      preserveAspectRatio="xMidYMid meet"
+      aria-hidden="true"
+    >
+      <polygon points={points} fill="none" stroke="#cbd5e1" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 export function tileLabel(tile: Tile): string {
   return `${COLOUR_LABEL[tile.colour]} ${SYMBOL_LABEL[tile.symbol]}`;
 }
