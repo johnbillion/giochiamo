@@ -7,11 +7,12 @@
 //   - the resulting state                      → applyAction
 // The UI's only job is to build candidate Actions from clicks and hand them to the engine.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   applyAction,
   availableActionTypes,
   createInitialState,
+  expansionsPerRound,
   isLegal,
   status,
 } from '../queens-garden/engine';
@@ -31,6 +32,7 @@ import {
   type Payment,
   type PlaceExpansionAction,
   type PlaceTileAction,
+  type PlayerCount,
   type PlayerState,
   type Expansion,
   type SlotId,
@@ -40,11 +42,13 @@ import {
 import { submit, type GameDispatch } from '../transport/submit';
 import {
   COLOUR_HEX,
+  COLOUR_LABEL,
   GRID_COLS,
   GRID_ROWS,
   expansionLabel,
   SLOT_LAYOUT,
   SYMBOL_GLYPH,
+  SYMBOL_LABEL,
   TileFace,
 } from './board';
 
@@ -311,8 +315,7 @@ export function Game() {
             <strong>Game over</strong>
           ) : (
             <>
-              Round {state.round}/{ROUND_COUNT} —{' '}
-              <strong>Player {state.currentPlayer + 1}'s turn</strong>
+              Round {state.round}/{ROUND_COUNT}
             </>
           )}
         </div>
@@ -347,24 +350,23 @@ export function Game() {
         <div className="draft">
           <h3>Draft {phase === Phase.Playing && `— Player ${state.currentPlayer + 1}`}</h3>
           <div className="chips">
-            <span className="chips-label">Colour:</span>
             {COLOURS.map((colour) => {
               const enabled = phase === Phase.Playing && draftable.has(`c:${colour}`);
               return (
                 <button
                   key={colour}
                   className="draft-chip draft-chip-colour"
+                  data-colour={colour}
                   disabled={!enabled}
                   onClick={() => draft({ kind: 'colour', colour })}
                   style={{ background: enabled ? COLOUR_HEX[colour] : undefined }}
                 >
-                  {colour}
+                  {COLOUR_LABEL[colour]}
                 </button>
               );
             })}
           </div>
           <div className="chips">
-            <span className="chips-label">Symbol:</span>
             {SYMBOLS.map((symbol) => {
               const enabled = phase === Phase.Playing && draftable.has(`s:${symbol}`);
               return (
@@ -374,7 +376,7 @@ export function Game() {
                   disabled={!enabled}
                   onClick={() => draft({ kind: 'symbol', symbol })}
                 >
-                  {SYMBOL_GLYPH[symbol]} {symbol}
+                  {SYMBOL_GLYPH[symbol]} {SYMBOL_LABEL[symbol]}
                 </button>
               );
             })}
@@ -387,7 +389,7 @@ export function Game() {
         <section className="actionbar">
           {sel.mode === 'idle' ? (
             <span className="hint">
-              Click a stored tile or expansion to start placing it, draft above, or pass.
+              Click a stored tile or garden expansion to start placing it, draft above, or pass.
             </span>
           ) : (
             <span className="placing">
@@ -454,10 +456,13 @@ function GameOver({ players }: { players: readonly PlayerState[] }) {
 
 function CentralArea({ state }: { state: State }) {
   const { central } = state;
+  // The round can expose up to `expansionsPerRound` expansion piles (the Top pile plus the opened
+  // ones); size the grid to that maximum so every pile sits at an equal fraction of the width.
+  const maxPiles = expansionsPerRound(state.players.length as PlayerCount);
   return (
-    <div className="displays">
+    <div className="displays" style={{ '--displays': maxPiles } as CSSProperties}>
       <div className="display">
-        <span className="display-label">Top{central.top ? ` (${central.top.tiles.length})` : ''}</span>
+        <span className="display-label">Top ({central.pile.length} face-down)</span>
         <div className="tiles">
           {central.top
             ? central.top.tiles.map((t, i) => <TileFace key={i} tile={t} size={28} />)
@@ -479,7 +484,6 @@ function CentralArea({ state }: { state: State }) {
           </div>
         </div>
       ))}
-      <div className="pile">Pile: {central.pile.length} face-down</div>
     </div>
   );
 }
@@ -507,16 +511,16 @@ function PlayerPanel({
   onExpansionItem: (i: number) => void;
   onCell: (slot: SlotId, dir: Direction) => void;
 }) {
-  const tiles = storageTiles(player.storage);
   return (
     <div className={`player${active ? ' active' : ''}`}>
-      <h2>
-        Player {id + 1} {active && <span className="turn-badge">your turn</span>}
-        {player.passed && <span className="passed-badge">passed</span>}
-      </h2>
-      <div className="score">
-        Score {player.score} · {storageCoins(player.storage)} coins · {tiles.length} tiles ·{' '}
-        {player.storage.expansions.length} expansions
+      <div className="player-header">
+        <h2>
+          Player {id + 1} {active && <span className="turn-badge">your turn</span>}
+          {player.passed && <span className="passed-badge">passed</span>}
+        </h2>
+        <div className="score">
+          Score: {player.score}
+        </div>
       </div>
 
       <Garden

@@ -6,12 +6,22 @@ import type { Colour, Expansion, Symbol, Tile } from '../queens-garden/types';
 
 // The 6 colours → CSS fills. (The engine's colour names are arbitrary labels; these are ours.)
 export const COLOUR_HEX: Record<Colour, string> = {
-  blue: '#3b82f6',
-  green: '#22c55e',
-  orange: '#f97316',
-  pink: '#ec4899',
-  red: '#ef4444',
-  yellow: '#eab308',
+  blue: '#1f6fff',
+  green: '#13c43a',
+  orange: '#ff8c00',
+  pink: '#cf52ff',
+  red: '#e00b2d',
+  yellow: '#ffd000',
+};
+
+// The 6 colours → display names shown in the UI.
+export const COLOUR_LABEL: Record<Colour, string> = {
+  blue: 'Blue',
+  green: 'Green',
+  orange: 'Orange',
+  pink: 'Magenta',
+  red: 'Red',
+  yellow: 'Yellow',
 };
 
 // The 6 symbols → a glyph each.
@@ -22,6 +32,16 @@ export const SYMBOL_GLYPH: Record<Symbol, string> = {
   flower: '🌸',
   herb: '🌿',
   lily: '🌷',
+};
+
+// The 6 symbols → display names shown in the UI.
+export const SYMBOL_LABEL: Record<Symbol, string> = {
+  tree: 'Tree',
+  bird: 'Bird',
+  butterflies: 'Butterflies',
+  flower: 'Flower',
+  herb: 'Herb',
+  lily: 'Lily',
 };
 
 // Grid position [grid-row, grid-column] of every tile slot, indexed [slot][dir]. Lifted from
@@ -41,11 +61,13 @@ export const GRID_ROWS = 12;
 export const GRID_COLS = 9;
 
 export function tileLabel(tile: Tile): string {
-  return `${tile.colour} ${tile.symbol}`;
+  return `${COLOUR_LABEL[tile.colour]} ${SYMBOL_LABEL[tile.symbol]}`;
 }
 
 export function expansionLabel(expansion: Expansion): string {
-  return expansion.identity ? `${expansion.identity.colour} ${expansion.identity.symbol}` : 'blank';
+  return expansion.identity
+    ? `${COLOUR_LABEL[expansion.identity.colour]} ${SYMBOL_LABEL[expansion.identity.symbol]}`
+    : 'blank';
 }
 
 // A single tile face: a coloured square with its symbol glyph. `size` is the side length in px.
