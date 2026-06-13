@@ -24,7 +24,8 @@ import {
   type Supply,
   type Tile,
 } from './types';
-import { makeRng } from './rng';
+import { makeRng, type Rng } from './rng';
+import { drawTiles } from './supply';
 import { draftableAttributes, draftIllegalReason, resolveDraft } from './draft';
 
 const PLAYER_COUNT_MIN = 2;
@@ -59,6 +60,24 @@ function sectionsPerRound(playerCount: number): number {
   return playerCount + 3;
 }
 
+// Deal a round's central area from the supply: n sections into a pile, 4 tiles onto the top.
+// Used at setup and at every round transition.
+function dealRound(
+  supply: Supply,
+  rng: Rng,
+  playerCount: number,
+): { central: CentralArea; supply: Supply } {
+  const n = sectionsPerRound(playerCount);
+  const roundSections = supply.sections.slice(0, n);
+  const draw = drawTiles(supply.bag, supply.discard, 4, rng);
+  const top: Display = { section: roundSections[0]!, tiles: draw.drawn };
+  const central: CentralArea = { top, open: [], pile: roundSections.slice(1) };
+  return {
+    central,
+    supply: { bag: draw.bag, discard: draw.discard, sections: supply.sections.slice(n) },
+  };
+}
+
 export function createInitialState(
   playerCount: number,
   seed: number,
@@ -69,16 +88,12 @@ export function createInitialState(
   }
 
   const rng = makeRng(seed);
-  const bag = rng.shuffle(buildTileBag());
-  const sectionPool = rng.shuffle(buildSectionPool());
-
-  // Deal this round's sections into a pile; the top section gets 4 tiles, the rest stay
-  // face-down beneath it.
-  const n = sectionsPerRound(playerCount);
-  const roundSections = sectionPool.slice(0, n);
-  const top: Display = { section: roundSections[0]!, tiles: bag.slice(0, 4) };
-  const central: CentralArea = { top, open: [], pile: roundSections.slice(1) };
-  const supply: Supply = { bag: bag.slice(4), discard: [], sections: sectionPool.slice(n) };
+  const fullSupply: Supply = {
+    bag: rng.shuffle(buildTileBag()),
+    discard: [],
+    sections: rng.shuffle(buildSectionPool()),
+  };
+  const { central, supply } = dealRound(fullSupply, rng, playerCount);
 
   const players: PlayerState[] = Array.from({ length: playerCount }, () => ({
     passed: false,
@@ -133,6 +148,8 @@ export function availableActionTypes(state: State): ActionType[] {
   if (status(state) !== Phase.Playing) return [];
   const kinds: ActionType[] = [
     ActionType.Reorder,
+    // TODO: PlaceSection/PlaceTiles are stub-legal until the placement rules add real
+    // preconditions; this list must then reflect them (as Draft does via draftableAttributes).
     ActionType.PlaceSection,
     ActionType.PlaceTiles,
     ActionType.Pass,
@@ -186,16 +203,31 @@ function endRound(state: State): State {
     return { ...state, players: scored, round: ROUND_COUNT + 1 };
   }
 
-  // TODO(next slice): discard the central area's leftover tiles and deal a fresh pile here.
-  // For now supply/central simply carry over unchanged (no action consumes them yet).
+  // Discard the central area's leftover tiles, then deal a fresh pile for the next round.
+  const rng = makeRng(state.rng);
+  const replenished: Supply = {
+    ...state.supply,
+    discard: [...state.supply.discard, ...centralTiles(state.central)],
+  };
+  const { central, supply } = dealRound(replenished, rng, state.players.length);
+
   // Start the next round: the first-passer leads, passes reset, marker cleared.
   return {
     ...state,
+    rng: rng.state(),
     players: scored.map((player) => ({ ...player, passed: false })),
     round: state.round + 1,
     currentPlayer: state.firstPasser ?? 0,
     firstPasser: null,
+    supply,
+    central,
   };
+}
+
+// All tiles currently sitting in the central area (top batch + split-off leftovers).
+function centralTiles(central: CentralArea): Tile[] {
+  const top = central.top ? central.top.tiles : [];
+  return [...top, ...central.open.flatMap((display) => display.tiles)];
 }
 
 function advanceTurn(state: State): State {

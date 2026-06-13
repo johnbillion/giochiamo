@@ -2,7 +2,8 @@
 // (the player picks which physical copy when a combo is draftable from more than one display)
 // plus every matching takeable (emptied) section — all gated by storage. See model.md.
 
-import { makeRng, type Rng } from './rng';
+import { makeRng } from './rng';
+import { drawTiles } from './supply';
 import {
   ActionType,
   COLOURS,
@@ -75,27 +76,6 @@ function sourceHasTile(central: CentralArea, source: DraftSource, combo: Tile): 
 function removeOne(tiles: Tile[], combo: Tile): void {
   const i = tiles.findIndex((t) => sameTile(t, combo));
   if (i >= 0) tiles.splice(i, 1);
-}
-
-// Draw `count` tiles from the bag, reshuffling the discard back in when the bag runs dry.
-function drawTiles(
-  bag: readonly Tile[],
-  discard: readonly Tile[],
-  count: number,
-  rng: Rng,
-): { drawn: Tile[]; bag: Tile[]; discard: Tile[] } {
-  let b = [...bag];
-  let d = [...discard];
-  const drawn: Tile[] = [];
-  for (let k = 0; k < count; k++) {
-    if (b.length === 0) {
-      if (d.length === 0) break; // nothing left anywhere
-      b = rng.shuffle(d);
-      d = [];
-    }
-    drawn.push(b.pop()!);
-  }
-  return { drawn, bag: b, discard: d };
 }
 
 // --- public API ---

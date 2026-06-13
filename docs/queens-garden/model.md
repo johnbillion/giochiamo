@@ -44,8 +44,22 @@ fields that can't be derived (the chess-castling lesson).
 
 ## Q3 — Derive vs store
 
-_(For each field above: can we derive it instead? Log the decisions. Default to
-deriving; store only the irreducible + history-dependent.)_
+- **Stored (irreducible):** the tile **bag**, **discard**, and **section pool** (the actual
+  remaining items); the **rng** state (determinism); the **central area** layout (pile / top /
+  open — a product of draw history); each player's **play area**, **storage**, and **score**.
+- **Stored (history-dependent — not derivable):** **currentPlayer** (turn order is
+  path-dependent via passing/skips — the chess "side to move" lesson, *unlike* TTT where we
+  derived it from a count); **firstPasser** and each player's **passed** flag (within-round
+  history); the **round #**.
+- **Derived (never stored):** **status/phase** (`round > ROUND_COUNT ? GameOver : Playing`);
+  whether a section is **takeable** (`open display tiles == 0`); **draftable attributes** and
+  legal moves (computed on demand); tile/coin **counts** in storage (`storageTiles` /
+  `storageCoins`).
+- **Decision — score is stored, not derived:** points accrue *during* play (round scoring + the
+  −1 first-passer penalty) rather than being recomputable from the final board, so the running
+  **score** is stored and mutated by the scoring resolvers.
+- **Open — scoring-wheel position:** currently to-be-stored; *could* be derived from the round #
+  if its rotation is fixed. Revisit when the wheel is modelled.
 
 ## Q4 — Actions (precondition + effect)
 
@@ -121,7 +135,14 @@ gets an entry — these are the future-bugs we're heading off.
     (`storageTiles`/`storageCoins` derive counts). One free **`reorder`** action targets either
     area (`area: 'tiles' | 'sections'`) — current player, must be a permutation, **no turn cost**.
     *(Confirm: reorder is free & on your turn; off-turn / per-player reorder deferred.)*
-21. **Payment:** A user must pay to place tiles and sections from their storage into their play area. Need to define how payment works.
+21. **Payment:** A user must pay to place tiles and sections from their storage into their play area.
+    Need to define how payment works.
+22. **Round end is automatic (condition-discovered).** When the pass that makes *everyone* passed
+    resolves, `applyAction` runs round scoring (first-passer −1 for now) **and** the round
+    transition in the same step — there's no explicit "end round" action. The transition
+    **discards the central area's leftover tiles** and **deals a fresh pile** (n sections + 4
+    tiles) for the next round via the shared `dealRound`. Game-over after round 4 falls out of the
+    same path. *(Fixes the earlier carry-over stub, now that the draft consumes the central area.)*
 
 ## Design notes
 

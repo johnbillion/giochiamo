@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyAction, availableActionTypes, createInitialState, isLegal, status } from './engine';
-import { ActionType, Phase, ROUND_COUNT, type Action, type State } from './types';
+import { ActionType, Phase, ROUND_COUNT, storageTiles, type Action, type State } from './types';
 
 const place: Action = { type: ActionType.PlaceSection };
 const pass: Action = { type: ActionType.Pass };
@@ -115,5 +115,24 @@ describe('legality', () => {
         expect(throws).toBe(!isLegal(s, action));
       }
     }
+  });
+});
+
+describe('round transition', () => {
+  it("deals a fresh pile and discards the previous round's central tiles", () => {
+    const s1 = passWholeRound(createInitialState(2, 7));
+    expect(s1.round).toBe(2);
+    expect(s1.central.top!.tiles).toHaveLength(4); // fresh top batch
+    expect(s1.central.open).toHaveLength(0); // nothing split off yet
+    expect(1 + s1.central.pile.length).toBe(5); // n = 5 sections for 2 players
+    expect(s1.supply.discard).toHaveLength(4); // round 1's 4 top tiles were discarded
+  });
+
+  it('conserves all 108 tiles across the transition', () => {
+    const s1 = passWholeRound(createInitialState(2, 7));
+    const central =
+      (s1.central.top?.tiles.length ?? 0) + s1.central.open.reduce((n, d) => n + d.tiles.length, 0);
+    const stored = s1.players.reduce((n, p) => n + storageTiles(p.storage).length, 0);
+    expect(s1.supply.bag.length + s1.supply.discard.length + central + stored).toBe(108);
   });
 });
