@@ -65,6 +65,25 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
     return show();
   };
 
+  const help = (): void => {
+    console.log(
+      [
+        "Queen's Garden playground — commands:",
+        '  g.draftColour(c)   take every draftable tile/section of colour c',
+        '  g.draftSymbol(s)   take every draftable tile/section of symbol s',
+        '  g.draft(attr)      draft by { kind: "colour" | "symbol", ... }',
+        '  g.placeSection()   (stubbed) place a section, ends your turn',
+        '  g.placeTiles()     (stubbed) place tiles, ends your turn',
+        '  g.pass()           pass for the rest of the round',
+        '  g.draftable()      attributes you could draft right now',
+        '  g.actions()        action kinds available right now',
+        '  g.show()           reprint the current board',
+        '  g.state            the raw, serializable game state',
+        '  g.help()           this message',
+      ].join('\n'),
+    );
+  };
+
   return {
     draft: (attribute: Attribute): State => act(buildDraft(state, attribute)),
     draftColour: (colour: Colour): State => act(buildDraft(state, { kind: 'colour', colour })),
@@ -75,6 +94,7 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
     actions: (): ActionType[] => availableActionTypes(state),
     draftable: (): Attribute[] => draftableAttributes(state),
     show,
+    help,
     get state(): State {
       return state;
     },
