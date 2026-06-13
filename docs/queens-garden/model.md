@@ -69,8 +69,13 @@ pure state transform. Filled in Pass 2.
 | Action | Parameters | Legal when (precondition) | Effect |
 |---|---|---|---|
 | Take (draft) | chosen **colour**/**symbol** + which copy of each duplicated combo | ≥1 draftable item bears it; one instance per **distinct** matching combo, chosen & present; distinct tiles ≤ free tile storage (12) **and** sections ≤ free section storage (2) | one chosen tile per distinct matching combo **and** all matching draftable sections → storage; then resolve splits/reveals |
-| Place section | _(stored section, target slot)_ | slot empty & playable; section in storage; … | section fills the slot |
-| Place tiles | _(stored tile[s], target space[s])_ | space in a placed section & empty; tile in storage; … | tile fills the space |
+| Place section | stored section + target slot + **payment** | section in storage; target slot empty & playable (adjacency TBD); **payment valid** (see below) | section → slot; payment items discarded |
+| Place tile | stored tile + target space + **payment** | tile in storage; target space free & in a placed section (which TBD); **payment valid** | tile → space; payment items discarded |
+
+**Payment** (both place actions): cost = the placed item's **symbol index (1–6)**, *inclusive of
+the item itself*. Pay the remaining `cost − 1` with **matching items** (sharing the placed item's
+colour *or* symbol — one axis, no duplicates) and/or **coins** (each a wildcard worth 1). All
+payment items + coins are discarded.
 | Pass | — | it's your turn & not yet passed | mark passed this round; _(cost/turn-order effect TBD)_ |
 
 ## Resolvers (stubbed until Pass 3)
@@ -123,26 +128,52 @@ gets an entry — these are the future-bugs we're heading off.
     matching combos, and the action carries a **per-duplicate source choice**.
 17. ~~Batch tiles vs. identity tile?~~ **RESOLVED:** the draftable tiles on a section are
     **separate** from the section's own immovable identity tile (and its placeable slots).
-18. **Draft decisions made in code (please confirm):**
+18. ~~Draft decisions (please confirm)?~~ **RESOLVED:**
     (a) a section emptied *by the current draft* becomes takeable **next** turn — only sections
     already empty before the draft are taken with it;
     (b) a **section-only** draft (no matching tiles, just a matching emptied section) is allowed;
     (c) you must take **all** distinct matching combos — no partial selection.
 19. **Coins** — **PARTIALLY RESOLVED:** coins live in the **tile storage area** and **count
     toward its 12-slot cap**; each player **starts with 3**. Earn/spend rules deferred.
-20. **Storage ordering** — both storage areas are ordered: the tile area is a `StorageItem[]`
+20. ~~Storage ordering?~~ **RESOLVED:** Both storage areas are ordered: the tile area is a `StorageItem[]`
     (`tile | coin`) and the section row is a `Section[]`. Order has **no gameplay effect**
     (`storageTiles`/`storageCoins` derive counts). One free **`reorder`** action targets either
     area (`area: 'tiles' | 'sections'`) — current player, must be a permutation, **no turn cost**.
-    *(Confirm: reorder is free & on your turn; off-turn / per-player reorder deferred.)*
 21. **Payment:** A user must pay to place tiles and sections from their storage into their play area.
     Need to define how payment works.
-22. **Round end is automatic (condition-discovered).** When the pass that makes *everyone* passed
+22. ~~Round end is automatic (condition-discovered)?~~ **RESOLVED:** When the pass that makes *everyone* passed
     resolves, `applyAction` runs round scoring (first-passer −1 for now) **and** the round
     transition in the same step — there's no explicit "end round" action. The transition
     **discards the central area's leftover tiles** and **deals a fresh pile** (n sections + 4
     tiles) for the next round via the shared `dealRound`. Game-over after round 4 falls out of the
     same path. *(Fixes the earlier carry-over stub, now that the draft consumes the central area.)*
+22. **Placement cost & payment — RESOLVED:** cost = the placed item's **symbol index (1–6)**,
+    *inclusive of the item itself*. Pay the remaining `cost − 1` with **matching items** (sharing
+    the placed item's colour *or* symbol — one axis, drafting-style, no duplicates) and/or
+    **coins** (each a wildcard worth 1). All payment items + coins are discarded. *Consequence:*
+    the **SYMBOLS order is now game-relevant** (it sets cost) — update the "arbitrary names" note
+    when codifying, via a `symbolCost(symbol) = index + 1` helper.
+23. **Placement — still open:**
+    (a) must all non-coin payment items match the placed item on the *same single* axis? (assumed
+    yes, per drafting); (b) can a payment item be identical to the placed item? (assumed no);
+    (c) discard destinations — payment **tiles → discard pile** (reshuffleable), **sections →
+    removed from play**, **coins → ?** (coin bank TBD); (d) can a place action place **one** item
+    or several per turn? (assumed one); (e) the **"where"** — section-slot adjacency (#8), tile
+    spaces & orientation (#3), cross-section adjacency (#5) — still needed before placement can be
+    codified.
+
+24. **Garden topology + the rotation question (feeds placement).** The 7 section-slots form a
+    hex flower: the **centre is adjacent to all 6** ring slots; each **ring slot** is adjacent to
+    the centre + its **2 ring-neighbours** (degree 3). Proposed representation: index every tile
+    position as **(slot 0–6, direction 0–5)**. Within a section, ring adjacency is `dir ± 1 mod
+    6`; across a shared edge, slot S's `dir d` tile is adjacent to neighbour T's `dir (d+3) mod 6`
+    tile. Encode the fixed topology **once** (a neighbour table, like TTT's `WIN_MASKS`) and unit-
+    test the derived 42-position adjacency graph — don't recompute geometry at runtime.
+    **Pivotal open question:** can a placed section be **rotated**, or is orientation **fixed**?
+    Fixed → tile-slots are absolute-direction-indexed (no per-section state; identity at a fixed
+    direction). Rotatable → store a `rotation` per placed section and derive board-direction ↔
+    intrinsic-slot from it. Also confirm: tile-slots sit on the 6 **edges** (one per direction),
+    and whether the identity tile's slot is fixed or travels with rotation.
 
 ## Design notes
 

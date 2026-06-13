@@ -89,7 +89,28 @@ both red tiles **and** the red section; **green** takes the 3 greens. A player w
 tile spaces can't take the greens; one with no free section space can't take the reds (the
 selection includes a section).
 
-_(Place rules and scoring — still to come.)_
+_(Scoring — still to come.)_
+
+## Placement & payment
+Placing a section or a tile (from storage into your garden) has a **cost** that must be **paid**.
+
+- **Cost = the index of the item's symbol (1–6).** Every tile and section shows a symbol; the
+  six symbols have a **fixed order**, and the cost is that symbol's 1-based position. _(So the
+  symbol order is game-relevant — it sets cost.)_
+- **The cost is inclusive of the item being placed** — the placed item counts as 1 toward it. A
+  cost-1 item pays for itself; a cost-C item needs **C − 1** more.
+- **Pay the remaining C − 1** with any mix of:
+  - **matching items** — tiles/sections from storage sharing the **placed item's colour OR its
+    symbol** (one chosen axis, same rule as drafting), **no two identical**; and
+  - **coins** — each is a wildcard worth **1**.
+- **All payment items (tiles, sections, coins) are discarded** when the item is placed; the
+  placed item leaves storage for the garden.
+
+_Examples:_ a **cost-3 section** = the section + one colour-matching tile + one coin (1+1+1). A
+**cost-6 tile** = the tile + three symbol-matching tiles/sections + two coins (1+3+2).
+
+_(Still to come — the **where**: which slot a section may fill, which space a tile may fill, and
+the adjacency rules.)_
 
 ## Round scoring
 _(Pass 3 — how scoring resolves at the end of a round, incl. the scoring wheel.)_
