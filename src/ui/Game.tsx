@@ -20,12 +20,10 @@ import { buildDraft, draftableAttributes } from '../queens-garden/draft';
 import { placeTileCoins, symbolCost } from '../queens-garden/placement';
 import {
   ActionType,
-  COLOURS,
   Phase,
   ROUND_COUNT,
   storageCoins,
   storageTiles,
-  SYMBOLS,
   type Action,
   type Attribute,
   type Direction,
@@ -346,42 +344,12 @@ export function Game() {
 
       <section className="central">
         <h2>Central area</h2>
-        <CentralArea state={state} />
-        <div className="draft">
-          <h3>Draft {phase === Phase.Playing && `— Player ${state.currentPlayer + 1}`}</h3>
-          <div className="chips">
-            {COLOURS.map((colour) => {
-              const enabled = phase === Phase.Playing && draftable.has(`c:${colour}`);
-              return (
-                <button
-                  key={colour}
-                  className="draft-chip draft-chip-colour"
-                  data-colour={colour}
-                  disabled={!enabled}
-                  onClick={() => draft({ kind: 'colour', colour })}
-                  style={{ background: enabled ? COLOUR_HEX[colour] : undefined }}
-                >
-                  {COLOUR_LABEL[colour]}
-                </button>
-              );
-            })}
-          </div>
-          <div className="chips">
-            {SYMBOLS.map((symbol) => {
-              const enabled = phase === Phase.Playing && draftable.has(`s:${symbol}`);
-              return (
-                <button
-                  key={symbol}
-                  className="draft-chip"
-                  disabled={!enabled}
-                  onClick={() => draft({ kind: 'symbol', symbol })}
-                >
-                  {SYMBOL_GLYPH[symbol]} {SYMBOL_LABEL[symbol]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <CentralArea
+          state={state}
+          draftable={draftable}
+          onDraft={draft}
+          canDraft={phase === Phase.Playing}
+        />
       </section>
 
       {/* The current player's action bar: payment status + pass. */}
@@ -454,18 +422,129 @@ function GameOver({ players }: { players: readonly PlayerState[] }) {
   );
 }
 
-function CentralArea({ state }: { state: State }) {
+// A central-area tile that, on hover, offers to draft by its colour or its symbol. Each button
+// shows how many tiles across the whole central area share that attribute, e.g. "Blue (3)".
+function DraftableTile({
+  tile,
+  size,
+  dimmed,
+  allTiles,
+  draftable,
+  onDraft,
+  onPreview,
+}: {
+  tile: Tile;
+  size: number;
+  dimmed: boolean;
+  allTiles: readonly Tile[];
+  draftable: ReadonlySet<string>;
+  onDraft: (attr: Attribute) => void;
+  onPreview: (attr: Attribute | null) => void;
+}) {
+  const colourCount = allTiles.filter((t) => t.colour === tile.colour).length;
+  const symbolCount = allTiles.filter((t) => t.symbol === tile.symbol).length;
+  const colourEnabled = draftable.has(`c:${tile.colour}`);
+  const symbolEnabled = draftable.has(`s:${tile.symbol}`);
+
+  // The popup is hover-driven, but a click must dismiss it even though the cursor is still over the
+  // tile. So we gate it on React state: open on hover, and force closed on click until the pointer
+  // leaves and returns.
+  const [open, setOpen] = useState(false);
+  const close = () => {
+    setOpen(false);
+    onPreview(null);
+  };
+  const pick = (attr: Attribute) => {
+    onDraft(attr);
+    close();
+  };
+
+  return (
+    <span
+      className={`draft-tile${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}`}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={close}
+    >
+      <TileFace tile={tile} size={size} />
+      <span className="tile-popup">
+        <button
+          className="draft-chip draft-chip-colour"
+          data-colour={tile.colour}
+          disabled={!colourEnabled}
+          onClick={() => pick({ kind: 'colour', colour: tile.colour })}
+          onMouseEnter={() => onPreview({ kind: 'colour', colour: tile.colour })}
+          onMouseLeave={() => onPreview(null)}
+          style={{ background: colourEnabled ? COLOUR_HEX[tile.colour] : undefined }}
+        >
+          {COLOUR_LABEL[tile.colour]} ({colourCount})
+        </button>
+        <button
+          className="draft-chip"
+          disabled={!symbolEnabled}
+          onClick={() => pick({ kind: 'symbol', symbol: tile.symbol })}
+          onMouseEnter={() => onPreview({ kind: 'symbol', symbol: tile.symbol })}
+          onMouseLeave={() => onPreview(null)}
+        >
+          {SYMBOL_GLYPH[tile.symbol]} {SYMBOL_LABEL[tile.symbol]} ({symbolCount})
+        </button>
+      </span>
+    </span>
+  );
+}
+
+function CentralArea({
+  state,
+  draftable,
+  onDraft,
+  canDraft,
+}: {
+  state: State;
+  draftable: ReadonlySet<string>;
+  onDraft: (attr: Attribute) => void;
+  canDraft: boolean;
+}) {
   const { central } = state;
   // The round can expose up to `expansionsPerRound` expansion piles (the Top pile plus the opened
   // ones); size the grid to that maximum so every pile sits at an equal fraction of the width.
   const maxPiles = expansionsPerRound(state.players.length as PlayerCount);
+
+  // The attribute being previewed (a popup button is hovered): all tiles that DON'T match it fade
+  // out, so the player can see exactly what a colour/symbol draft would pull from the area.
+  const [preview, setPreview] = useState<Attribute | null>(null);
+  const matchesPreview = (t: Tile): boolean =>
+    preview === null ||
+    (preview.kind === 'colour' ? t.colour === preview.colour : t.symbol === preview.symbol);
+
+  // Every tile currently in the central area — the pool a draft draws from, and the basis for the
+  // per-attribute counts shown in each tile's popup.
+  const allTiles: Tile[] = [];
+  if (central.top) allTiles.push(...central.top.tiles);
+  for (const d of central.open) allTiles.push(...d.tiles);
+
+  // A draft is only offered during play; otherwise tiles are plain (non-interactive) faces.
+  const renderTile = (t: Tile, key: number) =>
+    canDraft ? (
+      <DraftableTile
+        key={key}
+        tile={t}
+        size={28}
+        dimmed={!matchesPreview(t)}
+        allTiles={allTiles}
+        draftable={draftable}
+        onDraft={onDraft}
+        onPreview={setPreview}
+      />
+    ) : (
+      <TileFace key={key} tile={t} size={28} />
+    );
+
   return (
     <div className="displays" style={{ '--displays': maxPiles } as CSSProperties}>
       <div className="display">
         <span className="display-label">Top ({central.pile.length} face-down)</span>
         <div className="tiles">
           {central.top
-            ? central.top.tiles.map((t, i) => <TileFace key={i} tile={t} size={28} />)
+            ? central.top.tiles.map((t, i) => renderTile(t, i))
             : <em>empty</em>}
         </div>
       </div>
@@ -479,7 +558,7 @@ function CentralArea({ state }: { state: State }) {
           </span>
           <div className="tiles">
             {d.tiles.length
-              ? d.tiles.map((t, j) => <TileFace key={j} tile={t} size={28} />)
+              ? d.tiles.map((t, j) => renderTile(t, j))
               : <em>{d.expansion.identity ? expansionLabel(d.expansion) : 'starter'} expansion</em>}
           </div>
         </div>
