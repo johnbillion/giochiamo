@@ -32,9 +32,10 @@ export function symbolCost(symbol: Symbol): number {
   return SYMBOLS.indexOf(symbol) + 1;
 }
 
-// Two tiles share exactly one attribute (colour xor symbol).
-function shareExactlyOne(a: Tile, b: Tile): boolean {
-  return (a.colour === b.colour) !== (a.symbol === b.symbol);
+// Two tiles "match" if they share a colour or a symbol. (For two non-identical tiles this is the
+// same as sharing exactly one; identical tiles share both, but those are caught by the run rule.)
+function sharesAttribute(a: Tile, b: Tile): boolean {
+  return a.colour === b.colour || a.symbol === b.symbol;
 }
 
 function isMultisetSubset(needed: readonly string[], have: readonly string[]): boolean {
@@ -137,11 +138,15 @@ function joinsIdenticalTiles(after: Garden, placed: Tile, pos: TilePosition): bo
 
 // Adjacency + run checks on the garden as it would be *after* placing `placed` at `pos`.
 function placementGeometryReason(after: Garden, placed: Tile, pos: TilePosition): string | null {
-  for (const neighbour of adjacentPositions(pos)) {
-    const occupant = tileAtPosition(after, neighbour);
-    if (occupant && !shareExactlyOne(placed, occupant)) {
-      return 'must share exactly one of colour/symbol with every adjacent tile';
-    }
+  // A placed tile must MATCH (share a colour or symbol with) at least one of its occupied
+  // neighbours. A non-matching neighbour is tolerated as long as *some* neighbour matches — only a
+  // tile that matches NONE of its neighbours is illegal. (An isolated tile, with no occupied
+  // neighbour, is fine.) Identical-tile adjacencies are handled separately by the run rule below.
+  const neighbours = adjacentPositions(pos)
+    .map((neighbour) => tileAtPosition(after, neighbour))
+    .filter((occupant): occupant is Tile => occupant !== null);
+  if (neighbours.length > 0 && !neighbours.some((occupant) => sharesAttribute(placed, occupant))) {
+    return 'must share a colour or symbol with at least one adjacent tile';
   }
   if (joinsIdenticalTiles(after, placed, pos)) {
     return 'would join two identical tiles in a run';

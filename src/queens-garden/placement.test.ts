@@ -108,6 +108,37 @@ describe('place tile', () => {
     expect(isLegal(s0, action)).toBe(true);
   });
 
+  it('allows a tile that matches one neighbour even though another neighbour matches neither', () => {
+    // centre: dir2 = yellow/clover, dir4 = blue/bird. dir3 (between them) is adjacent to BOTH.
+    // Placing green/bird at dir3 matches the blue/bird (shares 'bird') but shares nothing with the
+    // yellow/clover. A non-matching neighbour is tolerated as long as some neighbour matches, so
+    // this is legal. ('bird' is cost 2 → pay 1, here with a coin.)
+    const garden = centreWith([
+      { dir: 2, tile: tile('yellow', 'clover') },
+      { dir: 4, tile: tile('blue', 'bird') },
+    ]);
+    const s0 = makeState(garden, { tileArea: [tileItem(tile('green', 'bird')), coinItem], sections: [] });
+    const payment: Payment = { tiles: [], sections: [], coins: 1 };
+    const action = { type: ActionType.PlaceTile, tile: tile('green', 'bird'), slot: 0, dir: 3, payment } as const;
+    expect(isLegal(s0, action)).toBe(true);
+  });
+
+  it('still rejects a tile that matches none of its neighbours', () => {
+    // Same board, but red/leaf at dir3 shares nothing with either the yellow/clover or the
+    // blue/bird — matching zero neighbours is still illegal.
+    const garden = centreWith([
+      { dir: 2, tile: tile('yellow', 'clover') },
+      { dir: 4, tile: tile('blue', 'bird') },
+    ]);
+    const s0 = makeState(garden, {
+      tileArea: [tileItem(tile('red', 'leaf')), coinItem, coinItem, coinItem, coinItem],
+      sections: [],
+    });
+    const payment: Payment = { tiles: [], sections: [], coins: 4 }; // 'leaf' is cost 5 → pay 4
+    const action = { type: ActionType.PlaceTile, tile: tile('red', 'leaf'), slot: 0, dir: 3, payment } as const;
+    expect(isLegal(s0, action)).toBe(false);
+  });
+
   it('rejects a placement that joins identical tiles in a mono-colour run', () => {
     // centre: dir0 = red/acorn, dir1 = red/bird. Placing red/acorn at dir2 makes the red run
     // dir0–dir1–dir2 = red/acorn, red/bird, red/acorn → two red/acorns joined.

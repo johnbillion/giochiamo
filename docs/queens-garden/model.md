@@ -70,8 +70,8 @@ pure state transform. Filled in Pass 2.
 | Action | Parameters | Legal when (precondition) | Effect |
 |---|---|---|---|
 | Take (draft) | chosen **colour**/**symbol** + which copy of each duplicated combo | ≥1 draftable item bears it; one instance per **distinct** matching combo, chosen & present; distinct tiles ≤ free tile storage (12) **and** sections ≤ free section storage (2) | one chosen tile per distinct matching combo **and** all matching draftable sections → storage; then resolve splits/reveals |
-| Place section | stored section + target slot + **which slot its identity occupies** + **payment** | section in storage; target slot **empty**; the identity tile (on its chosen slot) shares **exactly one** of its colour/symbol with any other-section tile it faces (not both, not neither; empty/no-neighbour fine); **payment valid** | a blank frame is placed with the identity tile on the chosen slot; payment discarded |
-| Place tile | stored tile + target (slot, dir) + **payment** | tile in storage; target is an **empty space of a placed section**; placed tile shares **exactly one** attribute with **every** face-adjacent occupied tile (within-section ring + cross-edge); **payment valid** | tile fills the space; payment discarded |
+| Place section | stored section + target slot + **which slot its identity occupies** + **payment** | section in storage; target slot **empty**; the identity tile (on its chosen slot) shares a colour/symbol with **at least one** other-section tile it faces (a non-matching neighbour is fine if another matches; empty/no-neighbour fine); **payment valid** | a blank frame is placed with the identity tile on the chosen slot; payment discarded |
+| Place tile | stored tile + target (slot, dir) + **payment** | tile in storage; target is an **empty space of a placed section**; placed tile shares a colour/symbol with **at least one** face-adjacent occupied tile (within-section ring + cross-edge), and joins no identical tiles in a run; **payment valid** | tile fills the space; payment discarded |
 
 **Payment** (both place actions): cost = the placed item's **symbol index (1–6)**, *inclusive of
 the item itself*. Pay the remaining `cost − 1` with **matching items** (sharing the placed item's
@@ -178,20 +178,22 @@ gets an entry — these are the future-bugs we're heading off.
     *The `garden` field is wired into `PlayerState` with the placement slice.*
 
 25. ~~Per-player gardens + section-placement adjacency~~ — **RESOLVED:** gardens are **per-player**.
-    A section goes in **any empty slot** at a chosen **rotation**; legal iff the **identity**
-    faces only empty space, or an other-section tile (fixed/placed) sharing **exactly one**
-    attribute (colour **xor** symbol) — facing **neither** (no match) *or* **both** (exact
-    duplicate, e.g. red-flower beside red-flower) is illegal. **Face/edge adjacency only** (#5), so
-    the identity has exactly **one** other-section neighbour: `(neighbourSlot(slot, rot), rot+3)`.
-    *(Tile-placement constraint, the "runs" rule, + further rules still to come.)*
+    A section goes in **any empty slot** at a chosen **rotation**; the **identity** must share a
+    colour/symbol with **at least one** other-section tile it faces (or face only empty space) —
+    see #26 for the adjacency predicate. **Face/edge adjacency only** (#5), so the identity has at
+    most **one** other-section neighbour: `(neighbourSlot(slot, rot), rot+3)`. *(Tile-placement
+    constraint, the "runs" rule, + further rules still to come.)*
 
-26. ~~Tile placement = the generalized adjacency rule~~ — **RESOLVED:** a tile goes on an **empty
-    space of a placed section** (never a section-less area); legal iff it shares **exactly one**
-    attribute (colour xor symbol) with **every** face-adjacent occupied tile — its section's ring
-    neighbours (incl. the identity) and the cross-edge tile. This is the same predicate as #25;
-    section placement is just the case where only the cross-edge neighbour can be occupied. One
-    helper covers both: `adjacentPositions` + `tileAt` + a `shareExactlyOne` check.
-
+26. ~~Tile placement = the generalized adjacency rule~~ — **CORRECTED** ~~(was: share exactly one
+    with EVERY neighbour).~~ A tile goes on an **empty space of a placed section** (never a
+    section-less area); legal iff it shares a colour/symbol (`sharesAttribute`) with **at least
+    one** face-adjacent occupied tile — its section's ring neighbours (incl. the identity) and the
+    cross-edge tile. A **non-matching** neighbour is tolerated as long as *some* neighbour matches;
+    only a tile matching **none** of its neighbours is illegal (an isolated tile, no occupied
+    neighbour, is fine). Identical-tile adjacencies aren't handled here — the **runs** rule (#27)
+    catches them. Same predicate as #25; section placement is just the case where only the
+    cross-edge neighbour can be occupied. One helper covers both: `adjacentPositions` + `tileAt` +
+    the `sharesAttribute` "at least one neighbour" check.
 27. ~~Runs — topology~~ **CORRECTED** ~~(supersedes the earlier fixed-lines model).~~ A *run* is a chain
     of face-adjacent tiles **all sharing one attribute** — all one colour, or all one symbol —
     following the adjacency graph **freely** (rounding rings, crossing section edges); it is **not**
