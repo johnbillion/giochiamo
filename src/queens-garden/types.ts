@@ -68,24 +68,33 @@ export type State = {
 };
 
 export const ActionType = {
-  TakeTiles: 'take-tiles',
-  TakeSections: 'take-sections',
+  Draft: 'draft',
   PlaceSection: 'place-section',
   PlaceTiles: 'place-tiles',
   Pass: 'pass',
 } as const;
 export type ActionType = (typeof ActionType)[keyof typeof ActionType];
 
-// The turn actions. Effects on take/place are still stubbed; in a later slice the two `take`
-// verbs collapse into one parameterised `draft` action (see model.md #10).
-export type TakeTilesAction = { readonly type: typeof ActionType.TakeTiles };
-export type TakeSectionsAction = { readonly type: typeof ActionType.TakeSections };
+// A draft is parameterised by a chosen colour OR symbol, plus — for each distinct matching
+// tile — which physical copy to take (its location can change whether a section is revealed).
+export type Attribute =
+  | { readonly kind: 'colour'; readonly colour: Colour }
+  | { readonly kind: 'symbol'; readonly symbol: Symbol };
+
+// Where a drafted tile is taken from: the top of the pile, or a split-off (open) display.
+export type DraftSource = { readonly area: 'top' } | { readonly area: 'open'; readonly index: number };
+
+export type TilePick = { readonly tile: Tile; readonly source: DraftSource };
+
+export type DraftAction = {
+  readonly type: typeof ActionType.Draft;
+  readonly attribute: Attribute;
+  readonly picks: readonly TilePick[]; // exactly one per distinct matching combo
+};
+
+// Placement effects are still stubbed (the placement rules come next).
 export type PlaceSectionAction = { readonly type: typeof ActionType.PlaceSection };
 export type PlaceTilesAction = { readonly type: typeof ActionType.PlaceTiles };
 export type PassAction = { readonly type: typeof ActionType.Pass };
-export type Action =
-  | TakeTilesAction
-  | TakeSectionsAction
-  | PlaceSectionAction
-  | PlaceTilesAction
-  | PassAction;
+
+export type Action = DraftAction | PlaceSectionAction | PlaceTilesAction | PassAction;

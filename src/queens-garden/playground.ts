@@ -1,37 +1,58 @@
-// A headless harness for driving the Queen's Garden round loop by hand — no UI.
+// Headless harness for the Queen's Garden engine — drive a game from the browser console:
+//   const g = qg.newGame(2)
+//   g.draftColour('red')   // or g.draftSymbol('bird'), or g.draft({ kind: 'colour', colour: 'red' })
+//   g.pass()
+//   g.draftable()          // attributes you could draft right now
+//   g.actions()            // action kinds available
+//   g.state                // raw serializable state
 //
-// In the browser console (via the dev hook in main.tsx):
-//   const g = qg.newGame(2)        // 2–4 players
-//   g.takeTiles(); g.pass()        // each call prints the state
-//   g.legal()                      // the actions currently allowed
-//   g.state                        // the raw, serializable state
-//
-// The action effects are still stubbed (this is the vertical slice) — take/place just
-// pass the turn — so what you're exercising here is the round/turn machine itself.
+// The draft takes the first available copy of each matching tile; placement is still stubbed.
 
-import { applyAction, createInitialState, legalActions, status } from './engine';
-import { ActionType, Phase, ROUND_COUNT, type Action, type State } from './types';
+import { applyAction, availableActionTypes, createInitialState, status } from './engine';
+import { buildDraft, draftableAttributes } from './draft';
+import {
+  ActionType,
+  Phase,
+  ROUND_COUNT,
+  type Action,
+  type Attribute,
+  type Colour,
+  type State,
+  type Symbol,
+  type Tile,
+} from './types';
+
+const tileStr = (t: Tile): string => `${t.colour}/${t.symbol}`;
+const attrStr = (a: Attribute): string => (a.kind === 'colour' ? a.colour : a.symbol);
 
 export function render(state: State): string {
   const phase = status(state);
   const lines: string[] = [
-    phase === Phase.GameOver
-      ? `Game over after ${ROUND_COUNT} rounds`
-      : `Round ${state.round}/${ROUND_COUNT} (${phase})`,
+    phase === Phase.GameOver ? 'Game over' : `Round ${state.round}/${ROUND_COUNT} (${phase})`,
   ];
 
-  state.players.forEach((player, i) => {
+  state.players.forEach((p, i) => {
     const turn = phase === Phase.Playing && i === state.currentPlayer ? '>' : ' ';
-    const passed = player.passed ? '  [passed]' : '';
-    lines.push(`${turn} P${i}  score ${player.score}${passed}`);
+    const passed = p.passed ? ' [passed]' : '';
+    lines.push(
+      `${turn} P${i}  score ${p.score}  storage ${p.storage.tiles.length}t/${p.storage.sections.length}s${passed}`,
+    );
   });
 
-  lines.push(`first to pass this round: ${state.firstPasser === null ? '—' : `P${state.firstPasser}`}`);
+  lines.push('central:');
+  lines.push(`  top: ${state.central.top ? state.central.top.tiles.map(tileStr).join(', ') : '(empty)'}`);
+  state.central.open.forEach((d, i) => {
+    const body = d.tiles.length
+      ? d.tiles.map(tileStr).join(', ')
+      : `(section ${d.section.identity ? tileStr(d.section.identity) : 'starter'})`;
+    lines.push(`  open[${i}]: ${body}`);
+  });
+  lines.push(`  pile: ${state.central.pile.length} face-down`);
+  lines.push(`draftable: ${draftableAttributes(state).map(attrStr).join(', ') || '—'}`);
+
   return lines.join('\n');
 }
 
-// A small mutable session so you don't thread state by hand. The engine underneath
-// stays pure — each call is just `state = applyAction(state, action)`.
 export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
   let state = createInitialState(playerCount, seed, firstPlayer);
 
@@ -39,19 +60,20 @@ export function newGame(playerCount = 2, seed = 1, firstPlayer = 0) {
     console.log(render(state));
     return state;
   };
-
   const act = (action: Action): State => {
     state = applyAction(state, action);
     return show();
   };
 
   return {
-    takeTiles: (): State => act({ type: ActionType.TakeTiles }),
-    takeSections: (): State => act({ type: ActionType.TakeSections }),
+    draft: (attribute: Attribute): State => act(buildDraft(state, attribute)),
+    draftColour: (colour: Colour): State => act(buildDraft(state, { kind: 'colour', colour })),
+    draftSymbol: (symbol: Symbol): State => act(buildDraft(state, { kind: 'symbol', symbol })),
     placeSection: (): State => act({ type: ActionType.PlaceSection }),
     placeTiles: (): State => act({ type: ActionType.PlaceTiles }),
     pass: (): State => act({ type: ActionType.Pass }),
-    legal: (): Action[] => legalActions(state),
+    actions: (): ActionType[] => availableActionTypes(state),
+    draftable: (): Attribute[] => draftableAttributes(state),
     show,
     get state(): State {
       return state;

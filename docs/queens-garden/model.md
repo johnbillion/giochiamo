@@ -109,6 +109,13 @@ gets an entry — these are the future-bugs we're heading off.
     matching combos, and the action carries a **per-duplicate source choice**.
 17. ~~Batch tiles vs. identity tile?~~ **RESOLVED:** the draftable tiles on a section are
     **separate** from the section's own immovable identity tile (and its placeable slots).
+18. **Draft decisions made in code (please confirm):**
+    (a) a section emptied *by the current draft* becomes takeable **next** turn — only sections
+    already empty before the draft are taken with it;
+    (b) a **section-only** draft (no matching tiles, just a matching emptied section) is allowed;
+    (c) you must take **all** distinct matching combos — no partial selection.
+19. **Coins:** A user earns coins during play that go into their tile storage area and can be used as part payment. Need to define how coins work.
+20. **Payment:** A user must pay to place tiles and sections from their storage into their play area. Need to define how payment works.
 
 ## Design notes
 

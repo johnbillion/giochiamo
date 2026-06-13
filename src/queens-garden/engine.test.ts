@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyAction, createInitialState, isLegal, legalActions, status } from './engine';
+import { applyAction, availableActionTypes, createInitialState, isLegal, status } from './engine';
 import { ActionType, Phase, ROUND_COUNT, type Action, type State } from './types';
 
-const take: Action = { type: ActionType.TakeTiles };
 const place: Action = { type: ActionType.PlaceSection };
 const pass: Action = { type: ActionType.Pass };
 
@@ -39,7 +38,7 @@ describe('setup', () => {
 
 describe('turn order', () => {
   it('a non-pass action passes the turn to the next player', () => {
-    const s = apply(createInitialState(2, 1, 0), take);
+    const s = apply(createInitialState(2, 1, 0), place);
     expect(s.currentPlayer).toBe(1);
     expect(s.round).toBe(1);
     expect(s.players.some((p) => p.passed)).toBe(false);
@@ -88,14 +87,16 @@ describe('game end', () => {
 });
 
 describe('legality', () => {
-  it('offers all five actions while playing and none once over', () => {
+  it('offers action kinds while playing and none once over', () => {
     const playing = createInitialState(2, 1, 0);
-    expect(legalActions(playing)).toHaveLength(5);
+    const kinds = availableActionTypes(playing);
+    expect(kinds).toContain(ActionType.Draft);
+    expect(kinds).toContain(ActionType.Pass);
 
     let over = playing;
     for (let r = 1; r <= ROUND_COUNT; r++) over = passWholeRound(over);
     expect(status(over)).toBe(Phase.GameOver);
-    expect(legalActions(over)).toHaveLength(0);
+    expect(availableActionTypes(over)).toHaveLength(0);
   });
 
   it('applyAction accepts exactly the legal actions (no divergence)', () => {
@@ -104,7 +105,7 @@ describe('legality', () => {
 
     const states: State[] = [createInitialState(2, 1, 0), createInitialState(4, 1, 2), over];
     for (const s of states) {
-      for (const action of [take, place, pass]) {
+      for (const action of [place, pass]) {
         let throws = false;
         try {
           applyAction(s, action);

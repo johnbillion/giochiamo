@@ -21,6 +21,7 @@ import {
   type Tile,
 } from './types';
 import { makeRng } from './rng';
+import { draftableAttributes, draftIllegalReason, resolveDraft } from './draft';
 
 const PLAYER_COUNT_MIN = 2;
 const PLAYER_COUNT_MAX = 4;
@@ -103,14 +104,14 @@ export function illegalReason(state: State, action: Action): string | null {
   }
 
   switch (action.type) {
-    case ActionType.Pass:
-      // The current player is always active (passed players are skipped), so pass is legal.
-      return null;
-    case ActionType.TakeTiles:
-    case ActionType.TakeSections:
+    case ActionType.Draft:
+      return draftIllegalReason(state, action);
     case ActionType.PlaceSection:
     case ActionType.PlaceTiles:
-      // No per-action preconditions yet — Pass 2 fills these in (e.g. storage limits).
+      // Placement preconditions arrive with the placement rules.
+      return null;
+    case ActionType.Pass:
+      // The current player is always active (passed players are skipped), so pass is legal.
       return null;
   }
 }
@@ -119,16 +120,14 @@ export function isLegal(state: State, action: Action): boolean {
   return illegalReason(state, action) === null;
 }
 
-const ALL_ACTIONS: readonly Action[] = [
-  { type: ActionType.TakeTiles },
-  { type: ActionType.TakeSections },
-  { type: ActionType.PlaceSection },
-  { type: ActionType.PlaceTiles },
-  { type: ActionType.Pass },
-];
-
-export function legalActions(state: State): Action[] {
-  return ALL_ACTIONS.filter((action) => isLegal(state, action));
+// What kinds of action are legal right now. A draft is parameterised (and can blow up
+// combinatorially), so it isn't enumerated here — use draftableAttributes + the draft builder
+// to construct a specific draft. The parameterless actions are simply listed.
+export function availableActionTypes(state: State): ActionType[] {
+  if (status(state) !== Phase.Playing) return [];
+  const kinds: ActionType[] = [ActionType.PlaceSection, ActionType.PlaceTiles, ActionType.Pass];
+  if (draftableAttributes(state).length > 0) kinds.unshift(ActionType.Draft);
+  return kinds;
 }
 
 export function applyAction(state: State, action: Action): State {
@@ -137,13 +136,16 @@ export function applyAction(state: State, action: Action): State {
     throw new Error(`Illegal action: ${reason}.`);
   }
 
-  if (action.type === ActionType.Pass) {
-    return resolvePass(state);
+  switch (action.type) {
+    case ActionType.Draft:
+      return advanceTurn(resolveDraft(state, action));
+    case ActionType.Pass:
+      return resolvePass(state);
+    case ActionType.PlaceSection:
+    case ActionType.PlaceTiles:
+      // Placement effects arrive with the placement rules — for now the turn just passes.
+      return advanceTurn(state);
   }
-
-  // take / place actions: stubbed for the slice — the player acts and the turn passes.
-  // Real effects on storage and the board arrive in Pass 2.
-  return advanceTurn(state);
 }
 
 // --- internal transitions ---
