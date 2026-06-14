@@ -219,28 +219,48 @@ export function jitterDegrees(key: string): number {
   return (jitterBucket(key) - (JITTER_BUCKETS - 1) / 2) * (span / (JITTER_BUCKETS - 1));
 }
 
-// The shared face primitive: a coloured pointy-top hexagon with an optional centred glyph.
+// The shared face primitive: a standalone SVG of a single coloured pointy-top hexagon with an
+// optional centred glyph. Unlike the old CSS clip-path span this replaced, an SVG <polygon> carries
+// a real stroke, so storage tiles can outline exactly like the ones placed in the garden (which is
+// itself one big SVG), and a flying clone can morph between the two without a tech seam. `size` is
+// the hex height in px; the box keeps the √3/2 width proportion and the viewBox hugs the hexagon
+// with a little padding so the stroke isn't clipped.
 function HexFace({
   fill,
   glyph,
   size,
-  title,
+  stroke,
+  strokeWidth = 1.5,
+  className = 'tile-face',
   jitter,
 }: {
   fill: string;
   glyph?: string;
   size: number;
-  title?: string;
+  stroke: string;
+  strokeWidth?: number;
+  className?: string;
   jitter?: number;
 }) {
+  const R = size / 2; // circumradius; a pointy-top hexagon is 2R tall
+  const halfW = (R * Math.sqrt(3)) / 2;
+  const pad = strokeWidth / 2 + 0.5;
   return (
-    <span
-      className="tile-face"
+    <svg
+      className={className}
       data-jitter={jitter}
-      style={{ background: fill, width: size * HEX_RATIO, height: size, fontSize: size * 0.5 }}
+      width={(size * HEX_RATIO).toFixed(2)}
+      height={size}
+      viewBox={`${(-halfW - pad).toFixed(2)} ${(-R - pad).toFixed(2)} ${(2 * halfW + 2 * pad).toFixed(2)} ${(2 * R + 2 * pad).toFixed(2)}`}
+      aria-hidden="true"
     >
-      {glyph}
-    </span>
+      <polygon points={hexPoints(0, 0, R)} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      {glyph && (
+        <text x={0} y={0} textAnchor="middle" dominantBaseline="central" fontSize={R}>
+          {glyph}
+        </text>
+      )}
+    </svg>
   );
 }
 
@@ -258,6 +278,8 @@ export function TileFace({
       fill={COLOUR_HEX[tile.colour]}
       glyph={SYMBOL_GLYPH[tile.symbol]}
       size={size}
+      // Match the stroke the garden gives a placed tile, so the two read as the same piece.
+      stroke="rgba(0, 0, 0, 0.4)"
       jitter={jitterBucket(`${tile.colour}:${tile.symbol}:${seed}`)}
     />
   );
@@ -265,23 +287,38 @@ export function TileFace({
 
 // An empty tile slot: a faint hexagon placeholder marking unused storage capacity.
 export function TileSlot({ size = 34 }: { size?: number }) {
-  return (
-    <span className="tile-face tile-slot" style={{ width: size * HEX_RATIO, height: size }} />
-  );
+  return <HexFace fill="#e7f1e0" size={size} stroke="none" className="tile-face tile-slot" />;
 }
 
-// A coin (wildcard payment piece):
+// A coin (wildcard payment piece): a round disc — a lighter face inside a darker rim — bearing the
+// coin glyph. Drawn as an SVG to sit alongside the tiles, though its shape is a circle, not a hex.
 export function CoinFace({ size = 34, seed = '' }: { size?: number; seed?: string | number }) {
-  const d = size * 0.85;
+  const d = size * 0.85; // coins read a touch smaller than the hex tiles beside them
+  const r = d / 2;
+  const pad = 0.5;
   return (
-    <span
+    <svg
       className="coin-face"
       data-jitter={jitterBucket(`coin:${seed}`)}
-      style={{ width: d, height: d, fontSize: d * 0.5 }}
+      width={d.toFixed(2)}
+      height={d.toFixed(2)}
+      viewBox={`${(-r - pad).toFixed(2)} ${(-r - pad).toFixed(2)} ${(d + 2 * pad).toFixed(2)} ${(d + 2 * pad).toFixed(2)}`}
+      aria-hidden="true"
     >
-      <span className="tile-face coin-rim" />
-      <span className="tile-face coin-inner">{COIN_GLYPH}</span>
-    </span>
+      <circle cx={0} cy={0} r={r} fill="#c08a2e" />
+      <circle cx={0} cy={0} r={r * 0.82} fill="#f3c34e" />
+      <text
+        x={0}
+        y={0}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={d * 0.5}
+        fontWeight={700}
+        fill="#7c5310"
+      >
+        {COIN_GLYPH}
+      </text>
+    </svg>
   );
 }
 

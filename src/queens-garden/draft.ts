@@ -72,12 +72,30 @@ function matchingCombos(central: CentralArea, attr: Attribute): Tile[] {
   return combos;
 }
 
-// Emptied (takeable) open expansions matching the attribute. A spent pile (expansion already
-// taken) has a null expansion and is skipped.
+// True once a display is emptied of tiles and its (identity-bearing) expansion matches the
+// attribute — i.e. that expansion is takeable by this draft. A spent pile (null expansion, already
+// taken) fails the first clause and is skipped.
+function isTakeable(display: Display, attr: Attribute): boolean {
+  return (
+    isEmptied(display) &&
+    display.expansion !== null &&
+    display.expansion.identity !== null &&
+    matchesAttribute(display.expansion.identity, attr)
+  );
+}
+
+// Emptied (takeable) expansions matching the attribute. The top is takeable in place only once the
+// unrevealed pile is gone — until then a dwindling top always splits off into `open` first (and so
+// is never emptied while it sits in the top slot).
 function matchingExpansions(central: CentralArea, attr: Attribute): Expansion[] {
-  return central.open
-    .filter((d) => isEmptied(d) && d.expansion !== null && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr))
-    .map((d) => d.expansion!);
+  const out: Expansion[] = [];
+  if (central.pile.length === 0 && central.top !== null && isTakeable(central.top, attr)) {
+    out.push(central.top.expansion!);
+  }
+  for (const d of central.open) {
+    if (isTakeable(d, attr)) out.push(d.expansion!);
+  }
+  return out;
 }
 
 function displayAt(central: CentralArea, source: DraftSource): Display | null {
@@ -163,15 +181,18 @@ export function resolveDraft(state: State, action: DraftAction): State {
     takenTiles.push(pick.tile);
   }
 
-  // 2. Take matching expansions that were already emptied (before this draft's removals).
+  // 2. Take matching expansions that were already emptied (before this draft's removals). The top
+  // qualifies only once the pile beneath it is gone — otherwise it has yet to split into `open`.
   const takenExpansions: Expansion[] = [];
   const takenIndices = new Set<number>();
   source.open.forEach((d, index) => {
-    if (isEmptied(d) && d.expansion !== null && d.expansion.identity !== null && matchesAttribute(d.expansion.identity, attr)) {
-      takenExpansions.push(d.expansion);
+    if (isTakeable(d, attr)) {
+      takenExpansions.push(d.expansion!);
       takenIndices.add(index);
     }
   });
+  const takeTop = source.pile.length === 0 && source.top !== null && isTakeable(source.top, attr);
+  if (takeTop) takenExpansions.push(source.top!.expansion!);
 
   // 3. Rebuild the open displays, keeping leftover tiles. A pile whose expansion was just taken
   // stays in place as a spent placeholder (null expansion) so the surviving piles don't shift.
@@ -180,23 +201,22 @@ export function resolveDraft(state: State, action: DraftAction): State {
     tiles: openTiles[index]!,
   }));
 
-  // 4. Split the top if it dropped below 4, revealing the next expansion with 4 fresh tiles.
-  let top: Display | null = source.top && topTiles ? { expansion: source.top.expansion, tiles: topTiles } : null;
+  // 4. Split the top if it dropped below 4 AND there's an expansion left to reveal in its place.
+  // With the pile exhausted there's nothing to reveal, so the dwindling top stays put in the top
+  // slot (rather than migrating into `open` and shifting the layout); once emptied it becomes
+  // takeable in place, and taking it leaves a spent placeholder (null expansion) behind.
+  let top: Display | null = source.top && topTiles ? { expansion: takeTop ? null : source.top.expansion, tiles: topTiles } : null;
   const pile = [...source.pile];
   let bag = [...state.supply.bag];
   let discard = [...state.supply.discard];
 
-  if (top !== null && liveCount(top.tiles) < 4) {
+  if (top !== null && liveCount(top.tiles) < 4 && pile.length > 0) {
     open.push(top); // splits off, carrying its leftover tiles
-    if (pile.length > 0) {
-      const nextExpansion = pile.shift()!;
-      const draw = drawTiles(bag, discard, 4, rng);
-      bag = draw.bag;
-      discard = draw.discard;
-      top = { expansion: nextExpansion, tiles: draw.drawn };
-    } else {
-      top = null;
-    }
+    const nextExpansion = pile.shift()!;
+    const draw = drawTiles(bag, discard, 4, rng);
+    bag = draw.bag;
+    discard = draw.discard;
+    top = { expansion: nextExpansion, tiles: draw.drawn };
   }
 
   // 5. Move the taken items into the current player's storage.

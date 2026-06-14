@@ -277,6 +277,11 @@ export function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, sel, payment]);
 
+  // The in-flight tile-placement fly-in (a chosen tile sailing from the dock into its garden cell),
+  // or null when none is playing. `key` remounts the overlay so a rapid second placement replays.
+  const [placeAnim, setPlaceAnim] = useState<PlaceAnim | null>(null);
+  const animKey = useRef(0);
+
   // --- click handlers (storage → selection / payment, garden → place) ---
 
   const toggle = (set: ReadonlySet<number>, i: number): Set<number> => {
@@ -321,10 +326,24 @@ export function Game() {
     setPaySecs((p) => toggle(p, i));
   };
 
-  const clickCell = (slot: SlotId, dir: Direction) => {
+  const clickCell = (slot: SlotId, dir: Direction, cellEl?: SVGGElement) => {
     const action = candidateAt(slot, dir);
     if (!action) return;
     if (!isLegal(state, action)) return;
+    // Fly the chosen tile from the payment dock into the cell it lands in. Both endpoints exist right
+    // now (the dock is still on screen, the target cell is the one just clicked), so capture their
+    // screen rects before the commit re-renders them away — the overlay then animates independently.
+    if (placedTile && cellEl) {
+      const source = document.querySelector('.player.active .dock-chosen .tile-face');
+      if (source) {
+        setPlaceAnim({
+          tile: placedTile,
+          from: source.getBoundingClientRect(),
+          to: cellEl.getBoundingClientRect(),
+          key: animKey.current++,
+        });
+      }
+    }
     act(action);
   };
 
@@ -413,6 +432,51 @@ export function Game() {
           />
         ))}
       </section>
+
+      {placeAnim && (
+        <FlyingTile
+          key={placeAnim.key}
+          anim={placeAnim}
+          onDone={() => setPlaceAnim((a) => (a?.key === placeAnim.key ? null : a))}
+        />
+      )}
+    </div>
+  );
+}
+
+// A tile-placement fly-in: the chosen `tile`, the dock rect it leaves `from`, and the garden-cell
+// rect it lands in `to`, both in viewport coordinates. `key` distinguishes successive placements.
+type PlaceAnim = { tile: Tile; from: DOMRect; to: DOMRect; key: number };
+
+// The overlay that animates a chosen tile sailing from the payment dock into its garden cell. It's a
+// fixed-position clone (the real cell has already filled underneath it), anchored at the destination
+// and released from a transform that puts it back at the dock — so it eases from one spot to the
+// other, then removes itself once the transition ends.
+function FlyingTile({ anim, onDone }: { anim: PlaceAnim; onDone: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { from, to } = anim;
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    const scale = to.height ? from.height / to.height : 1;
+    el.style.transition = 'none';
+    el.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+    const id = requestAnimationFrame(() => {
+      el.style.transition = 'transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1)';
+      el.style.transform = 'translate(0px, 0px) scale(1)';
+    });
+    return () => cancelAnimationFrame(id);
+  }, [from, to]);
+  return (
+    <div
+      ref={ref}
+      className="flying-tile"
+      style={{ left: to.left, top: to.top, width: to.width, height: to.height }}
+      onTransitionEnd={onDone}
+    >
+      <TileFace tile={anim.tile} size={to.height} />
     </div>
   );
 }
@@ -713,7 +777,7 @@ function CentralArea({
         { once: true },
       );
       requestAnimationFrame(() => {
-        node.style.transition = 'transform 20000ms cubic-bezier(0.2, 0.7, 0.2, 1)';
+        node.style.transition = 'transform 5000ms cubic-bezier(0.2, 0.7, 0.2, 1)';
         node.style.transform = '';
       });
     }
@@ -872,9 +936,11 @@ function CentralArea({
     </>
   );
 
-  // TEMP debug: pile id + the colour/symbol of the expansion underneath each display.
-  const debugDisplay = (id: number, expansion: Expansion | null) => {
+  // TEMP debug: the pile's stable FLIP key + the colour/symbol of the expansion underneath each
+  // display. The FLIP key is what tracks the pile across a draft, so it's what we want to eyeball.
+  const debugDisplay = (index: number, expansion: Expansion | null) => {
     const ident = expansion?.identity;
+    const flipKey = displayFlipKey(expansion, index);
     return (
       <div
         className="debug-pile"
@@ -890,7 +956,7 @@ function CentralArea({
           pointerEvents: 'none',
         }}
       >
-        #{id} {ident ? `${ident.colour}/${ident.symbol}` : '∅'}
+        {flipKey}
       </div>
     );
   };
@@ -923,7 +989,12 @@ function CentralArea({
           key={`top-${central.pile.length}`}
           data-flip-key={displayFlipKey(central.top.expansion, 0)}
         >
-          {renderTilePile(0, central.top.tiles, (slot) => ({ area: 'top', slot }))}
+          {/* Once the pile is exhausted the top dwindles in place: it keeps drawing tiles until
+              emptied, then shows its takeable expansion, then a spent placeholder — the same
+              lifecycle an open pile goes through, but without ever leaving the top slot. */}
+          {central.top.tiles.some(Boolean)
+            ? renderTilePile(0, central.top.tiles, (slot) => ({ area: 'top', slot }))
+            : renderExpansion(central.top.expansion, 0, 'top')}
           {debugDisplay(0, central.top.expansion)}
         </div>
       )}
@@ -1062,7 +1133,7 @@ function PlayerPanel({
   onPass: () => void;
   onTileItem: (i: number) => void;
   onExpansionItem: (i: number) => void;
-  onCell: (slot: SlotId, dir: Direction) => void;
+  onCell: (slot: SlotId, dir: Direction, cellEl?: SVGGElement) => void;
   onCancel: () => void;
 }) {
   const placing = active && sel.mode !== 'idle' && (placedTile !== null || placedExpansion !== null);
@@ -1213,7 +1284,7 @@ function GardenCell({
   preview: Tile | null;
   isPreviewCell: boolean;
   inHoveredRosette: boolean;
-  onCell: (slot: SlotId, dir: Direction) => void;
+  onCell: (slot: SlotId, dir: Direction, cellEl?: SVGGElement) => void;
   setHovered: Dispatch<SetStateAction<string | null>>;
 }) {
   const key = `${cell.slot}:${cell.dir}`;
@@ -1267,7 +1338,7 @@ function GardenCell({
       // Placed tiles get a tiny fixed tilt (keyed by their permanent slot:dir) for a
       // hand-placed look; empty/preview cells stay square so the grid reads cleanly.
       transform={cell.tile ? `rotate(${jitterDegrees(key)} ${cell.cx} ${cell.cy})` : undefined}
-      onClick={cell.legal ? () => onCell(cell.slot as SlotId, cell.dir as Direction) : undefined}
+      onClick={cell.legal ? (e) => onCell(cell.slot as SlotId, cell.dir as Direction, e.currentTarget) : undefined}
       onMouseEnter={cell.legal ? () => setHovered(key) : undefined}
       onMouseLeave={cell.legal ? () => setHovered((h) => (h === key ? null : h)) : undefined}
     >
@@ -1308,7 +1379,7 @@ function Garden({
   // while a placement is in progress; both null when idle.
   placedTile: Tile | null;
   placedExpansion: Expansion | null;
-  onCell: (slot: SlotId, dir: Direction) => void;
+  onCell: (slot: SlotId, dir: Direction, cellEl?: SVGGElement) => void;
 }) {
   const R = 18; // hex circumradius in px
   const placing = placedTile !== null || placedExpansion !== null;

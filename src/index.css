@@ -84,17 +84,17 @@ button:disabled {
 }
 
 /* coloured pointy-top hexagonal tile face with a symbol glyph */
+/* A tile face is now an inline <svg> (a real hexagon <polygon> with a stroke), not a clip-path span. */
 .tile-face {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
+  display: inline-block;
   vertical-align: middle;
   cursor: default;
-  /* Point on top and bottom; flat edges on the left and right. */
-  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-  /* clip-path would crop an inset border, so trace the hexagon edge with a drop-shadow instead. */
-  filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.45));
+}
+/* The symbol glyph is an SVG <text> node, which would otherwise show an I-beam cursor on hover. */
+.tile-face text,
+.coin-face text {
+  cursor: inherit;
+  user-select: none;
 }
 
 /* "Imperfect placement" jitter: each tile/expansion carries a data-jitter bucket (a stable hash of
@@ -112,10 +112,12 @@ button:disabled {
     )
     rotate(calc(var(--jr, 0deg) * var(--jitter-scale, 1)));
 }
-/* An <svg> element defaults to transform-box: view-box / transform-origin: 0 0, so it would pivot
-   around the viewBox corner and every rosette would tilt alike. Pin to its own centre, like the
-   HTML faces, so each expansion rotates in place by its own bucket. */
-.expansion-face[data-jitter] {
+/* Every face is now an <svg>, which defaults to transform-box: view-box / transform-origin: 0 0 — so
+   it would pivot around the viewBox corner and tilt all alike. Pin each to its own centre so it
+   rotates in place by its own bucket. */
+.tile-face[data-jitter],
+.expansion-face[data-jitter],
+.coin-face[data-jitter] {
   transform-box: fill-box;
   transform-origin: center;
 }
@@ -171,35 +173,10 @@ button:disabled {
   cursor: inherit;
 }
 
-/* an empty storage slot: a faint, flat hexagon placeholder (no edge shadow) */
-.tile-slot {
-  background: #e7f1e0;
-  filter: none;
-}
-
-/* a coin: a lighter silver face inside a darker rim, with a dark-grey glyph */
+/* a coin: an SVG disc (a lighter face inside a darker rim — see CoinFace); only layout here. */
 .coin-face {
-  position: relative;
-  display: inline-flex;
+  display: inline-block;
   vertical-align: middle;
-}
-/* Coins are round discs, not hexagons — override the hexagonal clip-path inherited from .tile-face. */
-.coin-face .coin-rim,
-.coin-face .coin-inner {
-  clip-path: none;
-  border-radius: 50%;
-}
-.coin-face .coin-rim {
-  position: absolute;
-  inset: 0;
-  background: #c08a2e;
-}
-.coin-face .coin-inner {
-  position: absolute;
-  inset: 9%;
-  background: #f3c34e;
-  color: #7c5310;
-  font-weight: 700;
 }
 
 /* --- central area --- */
@@ -518,6 +495,19 @@ button:disabled {
 .gglyph {
   pointer-events: none;
   user-select: none;
+}
+
+/* The fly-in clone of a tile being placed: a fixed-position overlay that eases from the payment dock
+   into its garden cell. Non-interactive and above everything; FlyingTile drives the transform. */
+.flying-tile {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  transform-origin: center;
+}
+.flying-tile .tile-face {
+  width: 100%;
+  height: 100%;
 }
 
 /* --- storage --- */

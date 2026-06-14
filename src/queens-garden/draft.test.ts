@@ -138,14 +138,34 @@ describe('draft — taking tiles', () => {
 
     expect(isLegal(s0, draft)).toBe(true);
     const s1 = applyAction(s0, draft);
-    // Taking one tile drops the top below 4, so it splits off into an open display carrying its
-    // leftovers. Slot 2 is the hole; the copy in slot 0 survives in its original slot.
-    expect(s1.central.open[0]!.tiles).toEqual([
+    // With the pile exhausted there's no expansion to reveal in its place, so the top stays put and
+    // dwindles where it sits. Slot 2 is the hole; the copy in slot 0 survives in its original slot.
+    expect(s1.central.open).toHaveLength(0);
+    expect(s1.central.top!.tiles).toEqual([
       tile('red', 'tree'),
       tile('pink', 'flower'),
       null,
       tile('green', 'herb'),
     ]);
+  });
+
+  it('keeps the last top in place as it dwindles, rather than shifting it into open', () => {
+    const central: CentralArea = {
+      top: {
+        expansion: { identity: tile('blue', 'tree') },
+        tiles: [tile('red', 'bird'), null, null, null], // one tile left, no pile beneath
+      },
+      open: [],
+      pile: [],
+    };
+    const s0 = makeState(central);
+
+    const s1 = applyAction(s0, buildDraft(s0, { kind: 'colour', colour: 'red' }));
+
+    // The pile didn't migrate into `open`; it stayed the top, now emptied of tiles but still
+    // carrying its (now takeable) expansion in the same slot.
+    expect(s1.central.open).toHaveLength(0);
+    expect(s1.central.top).toEqual({ expansion: { identity: tile('blue', 'tree') }, tiles: [null, null, null, null] });
   });
 });
 
@@ -166,6 +186,21 @@ describe('draft — taking expansions', () => {
     expect(storageTiles(s1.players[0]!.storage)).toHaveLength(0);
     // The pile stays in place as a spent placeholder (null expansion) so surviving piles don't shift.
     expect(s1.central.open).toEqual([{ expansion: null, tiles: [] }]);
+  });
+
+  it('takes the emptied top expansion in place once the pile is gone, leaving a spent placeholder', () => {
+    const s0 = makeState({
+      top: { expansion: { identity: tile('red', 'flower') }, tiles: [null, null, null, null] }, // emptied, takeable
+      open: [],
+      pile: [], // nothing left beneath, so the top is takeable where it sits
+    });
+
+    const s1 = applyAction(s0, buildDraft(s0, { kind: 'colour', colour: 'red' }));
+
+    expect(s1.players[0]!.storage.expansions).toEqual([{ identity: tile('red', 'flower') }]);
+    // The top keeps its slot as a spent placeholder (null expansion) rather than vanishing.
+    expect(s1.central.top).toEqual({ expansion: null, tiles: [null, null, null, null] });
+    expect(s1.central.open).toHaveLength(0);
   });
 });
 
