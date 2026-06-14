@@ -91,6 +91,69 @@ button:disabled {
   filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.45));
 }
 
+/* "Imperfect placement" jitter: each tile/expansion carries a data-jitter bucket (a stable hash of
+   the piece + its position, set in board.tsx) that maps to a tiny fixed rotation and offset, so
+   pieces look hand-placed rather than pixel-perfect. The buckets only set custom properties; the
+   shared rule below applies them. Board cells handle their own tilt via an SVG transform instead. */
+.tile-face[data-jitter],
+.expansion-face[data-jitter],
+.coin-face[data-jitter] {
+  /* Each bucket sets a base --jr/--jx/--jy; `--jitter-scale` (inherited from the container) dials the
+     whole effect up or down per context — bigger in the central area, gentler in player storage. */
+  transform: translate(
+      calc(var(--jx, 0) * var(--jitter-scale, 1)),
+      calc(var(--jy, 0) * var(--jitter-scale, 1))
+    )
+    rotate(calc(var(--jr, 0deg) * var(--jitter-scale, 1)));
+}
+/* An <svg> element defaults to transform-box: view-box / transform-origin: 0 0, so it would pivot
+   around the viewBox corner and every rosette would tilt alike. Pin to its own centre, like the
+   HTML faces, so each expansion rotates in place by its own bucket. */
+.expansion-face[data-jitter] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+[data-jitter='0'] {
+  --jr: -3.8deg;
+  --jx: 1.8px;
+  --jy: -2.1px;
+}
+[data-jitter='1'] {
+  --jr: 2.6deg;
+  --jx: -2.2px;
+  --jy: 1.5px;
+}
+[data-jitter='2'] {
+  --jr: -1.7deg;
+  --jx: 2.7px;
+  --jy: 1.9px;
+}
+[data-jitter='3'] {
+  --jr: 4deg;
+  --jx: -1.4px;
+  --jy: -1.8px;
+}
+[data-jitter='4'] {
+  --jr: -2.9deg;
+  --jx: -2.7px;
+  --jy: 2.4px;
+}
+[data-jitter='5'] {
+  --jr: 1.9deg;
+  --jx: 2.3px;
+  --jy: -1.3px;
+}
+[data-jitter='6'] {
+  --jr: -0.8deg;
+  --jx: -1.9px;
+  --jy: -2.7px;
+}
+[data-jitter='7'] {
+  --jr: 3.3deg;
+  --jx: 1.2px;
+  --jy: 2.7px;
+}
+
 /* an expansion piece: a miniature rosette (six hexes around a hollow centre) */
 .expansion-face {
   display: inline-block;
@@ -109,6 +172,12 @@ button:disabled {
   display: inline-flex;
   vertical-align: middle;
 }
+/* Coins are round discs, not hexagons — override the hexagonal clip-path inherited from .tile-face. */
+.coin-face .coin-rim,
+.coin-face .coin-inner {
+  clip-path: none;
+  border-radius: 50%;
+}
 .coin-face .coin-rim {
   position: absolute;
   inset: 0;
@@ -116,7 +185,7 @@ button:disabled {
 }
 .coin-face .coin-inner {
   position: absolute;
-  inset: 11%;
+  inset: 9%;
   background: #f3c34e;
   color: #7c5310;
   font-weight: 700;
@@ -129,6 +198,7 @@ button:disabled {
   border: 1px solid #d3e4ca;
   padding: 12px 16px;
   margin: 12px 0;
+  --jitter-scale: 1.5; /* stronger hand-placed tilt for tiles/expansions in the central area */
 }
 .central h2,
 .central h3 {
@@ -155,17 +225,19 @@ button:disabled {
 .display-reveal .tiles > * {
   animation: tile-reveal 420ms ease-out backwards;
 }
-.display-reveal .tiles > *:nth-child(1) {
-  animation-delay: 0ms;
+/* Stagger keyed off the per-tile data-reveal-order (a fresh random 1–4 permutation each reveal), so
+   the tiles don't always appear left-to-right. */
+.display-reveal .tiles > *[data-reveal-order='1'] {
+  animation-delay: 50ms;
 }
-.display-reveal .tiles > *:nth-child(2) {
+.display-reveal .tiles > *[data-reveal-order='2'] {
   animation-delay: 200ms;
 }
-.display-reveal .tiles > *:nth-child(3) {
-  animation-delay: 400ms;
+.display-reveal .tiles > *[data-reveal-order='3'] {
+  animation-delay: 350ms;
 }
-.display-reveal .tiles > *:nth-child(4) {
-  animation-delay: 600ms;
+.display-reveal .tiles > *[data-reveal-order='4'] {
+  animation-delay: 500ms;
 }
 @keyframes tile-reveal {
   from {
@@ -200,6 +272,21 @@ button:disabled {
   inset: 0;
   display: block;
   z-index: 1;
+}
+/* A pile-fill element mounts exactly when a pile's last tile is drafted and its expansion is
+   revealed (becomes takeable), so this fade/scale-in plays only then. */
+.pile-fill {
+  animation: expansion-reveal 380ms ease-out;
+}
+@keyframes expansion-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .expansion-face-fill {
   display: block;
@@ -422,6 +509,7 @@ button:disabled {
   display: flex;
   align-items: flex-start;
   gap: 14px;
+  --jitter-scale: 0.7; /* gentler tilt for pieces resting in player storage */
 }
 .items {
   display: flex;
@@ -446,6 +534,19 @@ button:disabled {
   padding: 2px;
   border-radius: 6px;
   display: inline-flex;
+  /* Items are keyed by storage index, so only freshly added tiles/expansions (e.g. just drafted)
+     mount and play this fade-in; existing items are reused in place and don't re-animate. */
+  animation: storage-fade-in 300ms ease-out;
+}
+@keyframes storage-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .item:not(:disabled):hover {
   border-color: #86997c;

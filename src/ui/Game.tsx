@@ -56,14 +56,18 @@ import {
   axialToPixel,
   COLOUR_HEX,
   COLOUR_LABEL,
+  colourLabel,
   CoinFace,
   DIR_AXIAL,
   ExpansionFace,
   ExpansionOutline,
   hexPoints,
+  jitterDegrees,
+  pileRotation,
   SLOT_CENTRE,
   SYMBOL_GLYPH,
   SYMBOL_LABEL,
+  symbolLabel,
   TileFace,
   TileSlot,
 } from './board';
@@ -357,6 +361,7 @@ export function Game() {
           draftable={draftable}
           onDraft={draft}
           canDraft={phase === Phase.Playing}
+          jitterSalt={seed}
         />
       </section>
 
@@ -365,6 +370,7 @@ export function Game() {
           <PlayerPanel
             key={i}
             id={i}
+            jitterSalt={seed}
             player={player}
             active={phase === Phase.Playing && i === state.currentPlayer}
             sel={sel}
@@ -415,6 +421,7 @@ function DraftablePiece({
   onDraft,
   onPreview,
   countFor,
+  revealOrder,
 }: {
   colour: Colour;
   symbol: Symbol;
@@ -426,6 +433,8 @@ function DraftablePiece({
   onPreview: (attr: Attribute | null) => void;
   // How many draftable pieces (tiles + takeable expansions) in the central area share an attribute.
   countFor: (attr: Attribute) => number;
+  // Position (1–4) in the randomized tile-reveal stagger; drives animation-delay via CSS. Top only.
+  revealOrder?: number | undefined;
 }) {
   const colourCount = countFor({ kind: 'colour', colour });
   const symbolCount = countFor({ kind: 'symbol', symbol });
@@ -470,6 +479,7 @@ function DraftablePiece({
 
   return (
     <span
+      data-reveal-order={revealOrder}
       className={`draft-tile${fill ? ' pile-fill' : ''}${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}${
         solo && soloEnabled ? ' clickable' : ''
       }`}
@@ -512,7 +522,7 @@ function DraftablePiece({
               onMouseLeave={() => onPreview(null)}
               style={{ background: colourEnabled ? COLOUR_HEX[colour] : undefined }}
             >
-              {COLOUR_LABEL[colour]} ({colourCount})
+              {colourLabel(colour, colourCount)} ({colourCount})
             </button>
             <button
               className="draft-chip"
@@ -521,7 +531,7 @@ function DraftablePiece({
               onMouseEnter={() => onPreview({ kind: 'symbol', symbol })}
               onMouseLeave={() => onPreview(null)}
             >
-              {SYMBOL_GLYPH[symbol]} {SYMBOL_LABEL[symbol]} ({symbolCount})
+              {SYMBOL_GLYPH[symbol]} {symbolLabel(symbol, symbolCount)} ({symbolCount})
             </button>
           </>
         )}
@@ -541,6 +551,17 @@ const sameSource = (a: DraftSource, b: DraftSource): boolean =>
 const sameExactSource = (a: DraftSource, b: DraftSource): boolean =>
   sameSource(a, b) && a.slot === b.slot;
 
+// A fresh random permutation of [1, 2, 3, 4] — the stagger positions for the four top tiles, so a
+// reveal isn't always left-to-right. Purely cosmetic, so Math.random (not the game RNG) is fine.
+const randomStagger = (): number[] => {
+  const order = [1, 2, 3, 4];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j]!, order[i]!];
+  }
+  return order;
+};
+
 // A combo (a distinct matching tile) whose physical copy the player must still choose, plus the
 // per-copy sources it can be taken from (one entry per matching tile, each carrying its slot).
 type PendingPick = { readonly combo: Tile; readonly sources: readonly DraftSource[] };
@@ -558,16 +579,43 @@ function CentralArea({
   draftable,
   onDraft,
   canDraft,
+  jitterSalt,
 }: {
   state: State;
   draftable: ReadonlySet<string>;
   onDraft: (action: DraftAction) => void;
   canDraft: boolean;
+  jitterSalt: number;
 }) {
   const { central } = state;
   // The round can expose up to `expansionsPerRound` expansion piles (the Top pile plus the opened
   // ones); size the grid to that maximum so every pile sits at an equal fraction of the width.
   const maxPiles = expansionsPerRound(state.players.length as PlayerCount);
+
+  // Play the top's tile-reveal animation only when a NEW top is genuinely revealed — i.e. the
+  // unrevealed-pile depth shrinks — not on the unrelated tile remounts that toggling the duplicate
+  // selector causes. `revealing` gates the animation class (it starts true so the very first top
+  // animates in, and a timer clears it once the stagger finishes); `revealOrder` is a fresh random
+  // permutation of the four stagger positions, so the tiles don't always appear left-to-right.
+  //
+  // Both are refreshed during render (not in an effect): adjusting state mid-render re-runs render
+  // before commit, so the new order is on the tiles when they mount — an effect would change the
+  // animation-delay after the animation had already started, causing a visible jump.
+  const [prevPileDepth, setPrevPileDepth] = useState(central.pile.length);
+  const [revealing, setRevealing] = useState(true);
+  const [revealOrder, setRevealOrder] = useState<readonly number[]>(randomStagger);
+  if (central.pile.length !== prevPileDepth) {
+    setPrevPileDepth(central.pile.length);
+    if (central.pile.length < prevPileDepth) {
+      setRevealing(true);
+      setRevealOrder(randomStagger());
+    }
+  }
+  useEffect(() => {
+    if (!revealing) return;
+    const timer = window.setTimeout(() => setRevealing(false), 1000);
+    return () => window.clearTimeout(timer);
+  }, [revealing]);
 
   // The attribute being previewed (a popup button is hovered): all tiles that DON'T match it fade
   // out, so the player can see exactly what a colour/symbol draft would pull from the area.
@@ -663,6 +711,8 @@ function CentralArea({
   // suppressed; instead, matching copies of the active combo become directly clickable.
   const renderTile = (t: Tile | null, key: number, source: DraftSource) => {
     if (t === null) return <span key={key} className="tile-blank" aria-hidden="true" />;
+    // A per-position seed so two identical tiles in the area don't share the same placement tilt.
+    const seed = source.area === 'top' ? `t${source.slot}` : `o${source.index}.${source.slot}`;
     if (draftSel) {
       const candidate = isCandidate(t, source);
       // Non-candidates are always dimmed; a candidate dims too when a *different* candidate is hovered.
@@ -675,7 +725,7 @@ function CentralArea({
           onMouseEnter={candidate ? () => setHoverPick(source) : undefined}
           onMouseLeave={candidate ? () => setHoverPick(null) : undefined}
         >
-          <TileFace tile={t} size={56} />
+          <TileFace tile={t} size={56} seed={seed} />
         </span>
       );
     }
@@ -684,15 +734,16 @@ function CentralArea({
         key={key}
         colour={t.colour}
         symbol={t.symbol}
-        face={<TileFace tile={t} size={56} />}
+        face={<TileFace tile={t} size={56} seed={seed} />}
         dimmed={!matchesPreview(t)}
         draftable={draftable}
         onDraft={(attr) => beginDraft(attr, { tile: t, source })}
         onPreview={setPreview}
         countFor={countFor}
+        revealOrder={source.area === 'top' ? revealOrder[source.slot ?? key] : undefined}
       />
     ) : (
-      <TileFace key={key} tile={t} size={56} />
+      <TileFace key={key} tile={t} size={56} seed={seed} />
     );
   };
 
@@ -700,9 +751,9 @@ function CentralArea({
   // A spent pile (null expansion — its expansion already taken) renders empty, leaving only the
   // rosette outline so the pile keeps its slot.
   // Rendered as a direct child of `.display` (not inside `.tiles`) so the rosette can fill the frame.
-  const renderExpansion = (expansion: Expansion | null, key: number) => {
+  const renderExpansion = (expansion: Expansion | null, key: number, seed: string | number = key) => {
     if (expansion === null) return <span key={key} className="pile-spent" aria-label="empty pile" />;
-    const face = <ExpansionFace expansion={expansion} fill />;
+    const face = <ExpansionFace expansion={expansion} fill seed={seed} />;
     const id = expansion.identity;
     if (!canDraft || !id) return <span key={key} className="pile-fill">{face}</span>;
     return (
@@ -741,27 +792,39 @@ function CentralArea({
       <div className="displays" style={{ '--displays': maxPiles } as CSSProperties}>
       {central.top && (
         // Keyed on the unrevealed-pile depth, which drops by one every time a new top is revealed
-        // (and only then). A fresh key remounts this display, replaying the fade-in — so the new
-        // pile top fades in after a draft splits the previous one off.
-        <div className="display display-reveal" key={`top-${central.pile.length}`}>
-          <ExpansionOutline />
+        // (and only then). A fresh key remounts this display so the tile fade-in replays; the
+        // `display-reveal` class is only present while `revealing`, so toggling the duplicate
+        // selector (which remounts the tiles too) does not retrigger the animation.
+        <div
+          className={`display${revealing ? ' display-reveal' : ''}`}
+          key={`top-${central.pile.length}`}
+        >
+          <ExpansionOutline rotate={pileRotation(`${jitterSalt}:${state.round}:0`)} />
           <div className="tiles">
             {central.top.tiles.map((t, i) => renderTile(t, i, { area: 'top', slot: i }))}
           </div>
         </div>
       )}
-      {central.open.map((d, i) => (
-        <div className="display" key={i}>
-          <ExpansionOutline />
-          {d.tiles.some(Boolean) ? (
-            <div className="tiles">
-              {d.tiles.map((t, j) => renderTile(t, j, { area: 'open', index: i, slot: j }))}
-            </div>
-          ) : (
-            renderExpansion(d.expansion, 0)
-          )}
-        </div>
-      ))}
+      {central.open.map((d, i) => {
+        const hasTiles = d.tiles.some(Boolean);
+        // The rosette outline frames a pile's tiles. A takeable expansion fills the frame with its
+        // own rosette (so the outline behind would be redundant), and a spent pile (expansion already
+        // taken) should read as empty — so only tile piles draw the outline.
+        return (
+          <div className="display" key={i}>
+            {hasTiles && (
+              <ExpansionOutline rotate={pileRotation(`${jitterSalt}:${state.round}:${i + 1}`)} />
+            )}
+            {hasTiles ? (
+              <div className="tiles">
+                {d.tiles.map((t, j) => renderTile(t, j, { area: 'open', index: i, slot: j }))}
+              </div>
+            ) : (
+              renderExpansion(d.expansion, 0, `open${i}`)
+            )}
+          </div>
+        );
+      })}
       </div>
     </>
   );
@@ -817,9 +880,9 @@ function PaymentDock({
             return (
               <button key={`t${i}`} className="dock-slot filled" onClick={() => onUnselectTile(i)}>
                 {item.kind === 'coin' ? (
-                  <CoinFace size={48} />
+                  <CoinFace size={48} seed={i} />
                 ) : (
-                  <TileFace tile={item.tile} size={48} />
+                  <TileFace tile={item.tile} size={48} seed={i} />
                 )}
               </button>
             );
@@ -853,6 +916,7 @@ function PaymentDock({
 
 function PlayerPanel({
   id,
+  jitterSalt,
   player,
   active,
   sel,
@@ -869,6 +933,7 @@ function PlayerPanel({
   onCancel,
 }: {
   id: number;
+  jitterSalt: number;
   player: PlayerState;
   active: boolean;
   sel: Selection;
@@ -941,7 +1006,7 @@ function PlayerPanel({
                     disabled={!active}
                     onClick={() => onTileItem(i)}
                   >
-                    {ghost ? <TileSlot size={60} /> : <CoinFace size={60} />}
+                    {ghost ? <TileSlot size={60} /> : <CoinFace size={60} seed={`${jitterSalt}.${id}.${i}`} />}
                   </button>
                 );
               }
@@ -952,7 +1017,11 @@ function PlayerPanel({
                   disabled={!active}
                   onClick={() => onTileItem(i)}
                 >
-                  {ghost ? <TileSlot size={60} /> : <TileFace tile={item.tile} size={60} />}
+                  {ghost ? (
+                    <TileSlot size={60} />
+                  ) : (
+                    <TileFace tile={item.tile} size={60} seed={`${jitterSalt}.${id}.${i}`} />
+                  )}
                 </button>
               );
             })}
@@ -973,7 +1042,11 @@ function PlayerPanel({
                   disabled={!active}
                   onClick={() => onExpansionItem(i)}
                 >
-                  <ExpansionFace expansion={ghost ? { identity: null } : s} size={18} />
+                  <ExpansionFace
+                    expansion={ghost ? { identity: null } : s}
+                    size={18}
+                    seed={`${jitterSalt}.${id}.${i}`}
+                  />
                 </button>
               );
             })}
@@ -1139,6 +1212,9 @@ function Garden({
           <g
             key={key}
             className={className}
+            // Placed tiles get a tiny fixed tilt (keyed by their permanent slot:dir) for a
+            // hand-placed look; empty/preview cells stay square so the grid reads cleanly.
+            transform={c.tile ? `rotate(${jitterDegrees(key)} ${c.cx} ${c.cy})` : undefined}
             onClick={c.legal ? () => onCell(c.slot as SlotId, c.dir as Direction) : undefined}
             onMouseEnter={c.legal ? () => setHovered(key) : undefined}
             onMouseLeave={c.legal ? () => setHovered((h) => (h === key ? null : h)) : undefined}

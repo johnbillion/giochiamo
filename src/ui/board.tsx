@@ -24,6 +24,16 @@ export const COLOUR_LABEL: Record<Colour, string> = {
   yellow: 'Yellow',
 };
 
+// Plural display names, hardcoded rather than naively suffixed with "s".
+export const COLOUR_LABEL_PLURAL: Record<Colour, string> = {
+  blue: 'Blues',
+  green: 'Greens',
+  orange: 'Oranges',
+  pink: 'Magentas',
+  red: 'Reds',
+  yellow: 'Yellows',
+};
+
 // The 6 symbols → a glyph each.
 export const SYMBOL_GLYPH: Record<Symbol, string> = {
   tree: '🌳',
@@ -35,7 +45,7 @@ export const SYMBOL_GLYPH: Record<Symbol, string> = {
 };
 
 // The glyph shown on a coin (wildcard payment piece). Kept as a constant so it can be localised.
-export const COIN_GLYPH = '$';
+export const COIN_GLYPH = '€';
 
 // The 6 symbols → display names shown in the UI.
 export const SYMBOL_LABEL: Record<Symbol, string> = {
@@ -46,6 +56,26 @@ export const SYMBOL_LABEL: Record<Symbol, string> = {
   herb: 'Herb',
   lily: 'Lily',
 };
+
+// Plural display names, hardcoded so irregulars like "Lilies" read correctly. ("Butterflies" is
+// already plural-formed even in the singular, so it stays put.)
+export const SYMBOL_LABEL_PLURAL: Record<Symbol, string> = {
+  tree: 'Trees',
+  bird: 'Birds',
+  butterflies: 'Butterflies',
+  flower: 'Flowers',
+  herb: 'Herbs',
+  lily: 'Lilies',
+};
+
+// Pick the singular or plural label for a colour/symbol based on how many are being referred to.
+export function colourLabel(colour: Colour, count = 1): string {
+  return count === 1 ? COLOUR_LABEL[colour] : COLOUR_LABEL_PLURAL[colour];
+}
+
+export function symbolLabel(symbol: Symbol, count = 1): string {
+  return count === 1 ? SYMBOL_LABEL[symbol] : SYMBOL_LABEL_PLURAL[symbol];
+}
 
 // --- garden board geometry (pointy-top hexagons, in a flower-of-flowers) ---
 // Each expansion is a ring of six tiles around a hollow centre; the seven expansion centres are
@@ -109,7 +139,9 @@ const EXPANSION_OUTLINE_POINTS = (() => {
 })();
 
 // A standalone SVG of the expansion-rosette outline, scaled to fill (and centre within) its box.
-export function ExpansionOutline() {
+// `rotate` spins the (origin-centred, 6-fold-symmetric) silhouette in place by a few degrees for a
+// hand-laid look. The viewBox is sized for the unrotated shape, so keep rotations modest.
+export function ExpansionOutline({ rotate = 0 }: { rotate?: number }) {
   const R = 10;
   const s = Math.sqrt(3);
   const pad = 2;
@@ -125,7 +157,14 @@ export function ExpansionOutline() {
       preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
     >
-      <polygon points={points} fill="none" stroke="#bcd6ad" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      <polygon
+        points={points}
+        fill="none"
+        stroke="#bcd6ad"
+        strokeWidth={2}
+        vectorEffect="non-scaling-stroke"
+        transform={rotate ? `rotate(${rotate})` : undefined}
+      />
     </svg>
   );
 }
@@ -144,22 +183,60 @@ export function expansionLabel(expansion: Expansion): string {
 // the proportions correct (the CSS clip-path then fills it exactly). `size` is the height in px.
 const HEX_RATIO = Math.sqrt(3) / 2; // ≈ 0.866, width ÷ height of a regular pointy-top hexagon
 
+// Each tile/expansion gets a tiny, fixed "imperfect placement" tilt. The bucket is a deterministic
+// hash of a key, so it's stable across re-renders (a tile never jiggles in place) yet varies between
+// pieces. Pass a per-position `seed` so two identical tiles in the same pile/row don't tilt alike.
+// Purely cosmetic — the CSS in index.css maps each bucket to a small rotation/offset.
+// FNV-1a with an avalanche finalizer → an unsigned 32-bit hash. The finalizer matters: the low bits
+// are all the callers below use, and a plain polynomial hash mixes those poorly (the last character
+// dominates), so a mid-key salt would wash out. Avalanching spreads every bit down into the low bits.
+function hash32(key: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  h ^= h >>> 13;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+export const JITTER_BUCKETS = 8;
+export function jitterBucket(key: string): number {
+  return hash32(key) % JITTER_BUCKETS;
+}
+
+// A stable pseudo-random angle in [0, 50) degrees for a pile's background rosette. Key it however the
+// caller wants stability to hold — e.g. round + pile index: steady within a round, fresh each round.
+export function pileRotation(key: string): number {
+  return (hash32(key) % 5000) / 100;
+}
+// Degrees for a board cell, derived from the same buckets, centred on 0 (≈ ±1.2°). The packed
+// rosette can't use the HTML offsets (they'd gap the grid), so board cells only rotate, a little.
+export function jitterDegrees(key: string): number {
+  const span = 2.4;
+  return (jitterBucket(key) - (JITTER_BUCKETS - 1) / 2) * (span / (JITTER_BUCKETS - 1));
+}
+
 // The shared face primitive: a coloured pointy-top hexagon with an optional centred glyph.
 function HexFace({
   fill,
   glyph,
   size,
   title,
+  jitter,
 }: {
   fill: string;
   glyph?: string;
   size: number;
   title?: string;
+  jitter?: number;
 }) {
   return (
     <span
       className="tile-face"
-      title={title}
+      data-jitter={jitter}
       style={{ background: fill, width: size * HEX_RATIO, height: size, fontSize: size * 0.5 }}
     >
       {glyph}
@@ -167,8 +244,23 @@ function HexFace({
   );
 }
 
-export function TileFace({ tile, size = 34 }: { tile: Tile; size?: number }) {
-  return <HexFace fill={COLOUR_HEX[tile.colour]} glyph={SYMBOL_GLYPH[tile.symbol]} size={size} />;
+export function TileFace({
+  tile,
+  size = 34,
+  seed = '',
+}: {
+  tile: Tile;
+  size?: number;
+  seed?: string | number;
+}) {
+  return (
+    <HexFace
+      fill={COLOUR_HEX[tile.colour]}
+      glyph={SYMBOL_GLYPH[tile.symbol]}
+      size={size}
+      jitter={jitterBucket(`${tile.colour}:${tile.symbol}:${seed}`)}
+    />
+  );
 }
 
 // An empty tile slot: a faint hexagon placeholder marking unused storage capacity.
@@ -178,13 +270,14 @@ export function TileSlot({ size = 34 }: { size?: number }) {
   );
 }
 
-// A coin (wildcard payment piece): a silver hexagon with a darker rim and a dark-grey glyph.
-export function CoinFace({ size = 34 }: { size?: number }) {
+// A coin (wildcard payment piece):
+export function CoinFace({ size = 34, seed = '' }: { size?: number; seed?: string | number }) {
+  const d = size * 0.85;
   return (
     <span
       className="coin-face"
-      title="coin (wildcard payment)"
-      style={{ width: size * HEX_RATIO, height: size, fontSize: size * 0.5 }}
+      data-jitter={jitterBucket(`coin:${seed}`)}
+      style={{ width: d, height: d, fontSize: d * 0.5 }}
     >
       <span className="tile-face coin-rim" />
       <span className="tile-face coin-inner">{COIN_GLYPH}</span>
@@ -203,12 +296,15 @@ export function ExpansionFace({
   expansion,
   size = 18,
   fill = false,
+  seed = '',
 }: {
   expansion: Expansion;
   size?: number;
   fill?: boolean;
+  seed?: string | number;
 }) {
   const id = expansion.identity;
+  const jitter = jitterBucket(`${id ? `${id.colour}:${id.symbol}` : 'starter'}:${seed}`);
   const r = size; // circumradius of each hex in the rosette
   // Draw the identity hex last so its darker border is never overdrawn by an adjacent hex's lighter
   // one — it sits on top on all sides (same paint-order trick the board uses for placed expansions).
@@ -228,6 +324,7 @@ export function ExpansionFace({
   return (
     <svg
       className={fill ? 'expansion-face expansion-face-fill' : 'expansion-face'}
+      data-jitter={jitter}
       viewBox={`${minX.toFixed(2)} ${minY.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`}
       {...(fill ? { preserveAspectRatio: 'xMidYMid meet' } : { width: w.toFixed(2), height: h.toFixed(2) })}
       role="img"
