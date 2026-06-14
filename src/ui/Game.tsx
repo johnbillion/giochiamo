@@ -24,16 +24,14 @@ import {
   isLegal,
   status,
 } from '../queens-garden/engine';
-import { buildDraft, draftableAttributes } from '../queens-garden/draft';
-import { placeTileCoins, symbolCost } from '../queens-garden/placement';
+import { buildDraft, draftableAttributes, draftPlan } from '../queens-garden/draft';
+import { symbolCost } from '../queens-garden/placement';
 import {
   ActionType,
   Phase,
   ROUND_COUNT,
   STORAGE_EXPANSION_LIMIT,
   STORAGE_TILE_LIMIT,
-  storageCoins,
-  storageTiles,
   type Action,
   type Attribute,
   type Colour,
@@ -47,6 +45,7 @@ import {
   type Expansion,
   type SlotId,
   type State,
+  type StorageItem,
   type Tile,
 } from '../queens-garden/types';
 import { submit, type GameDispatch } from '../transport/submit';
@@ -56,7 +55,6 @@ import {
   COLOUR_LABEL,
   CoinFace,
   DIR_AXIAL,
-  expansionLabel,
   ExpansionFace,
   ExpansionOutline,
   hexPoints,
@@ -117,7 +115,6 @@ export function Game() {
   const [sel, setSel] = useState<Selection>({ mode: 'idle' });
   const [payTiles, setPayTiles] = useState<ReadonlySet<number>>(new Set());
   const [paySecs, setPaySecs] = useState<ReadonlySet<number>>(new Set());
-  const [note, setNote] = useState<string | null>(null);
   // Every applied action, in order — the seed + this log replay the game deterministically.
   const [log, setLog] = useState<readonly Action[]>([]);
   const [copied, setCopied] = useState(false);
@@ -131,7 +128,6 @@ export function Game() {
     setSel({ mode: 'idle' });
     setPayTiles(new Set());
     setPaySecs(new Set());
-    setNote(null);
   };
 
   // A new turn (or a new game) wipes any half-built placement — it belonged to the prior player.
@@ -231,7 +227,6 @@ export function Game() {
   const placedRef: Tile | null = placedTile ?? placedExpansion?.identity ?? null;
   const cost = placedRef ? symbolCost(placedRef.symbol) : 0;
   const need = Math.max(0, cost - 1);
-  const paid = payment.tiles.length + payment.expansions.length + payment.coins;
 
   // Build the candidate Action for placing the selected item at (slot, dir) with the chosen
   // payment. Returns null if nothing is selected.
@@ -276,7 +271,6 @@ export function Game() {
         setSel({ mode: 'tile', idx: i });
         setPayTiles(new Set());
         setPaySecs(new Set());
-        setNote(null);
       }
       return;
     }
@@ -294,7 +288,6 @@ export function Game() {
         setSel({ mode: 'expansion', idx: i });
         setPayTiles(new Set());
         setPaySecs(new Set());
-        setNote(null);
       }
       return;
     }
@@ -309,11 +302,6 @@ export function Game() {
     const action = candidateAt(slot, dir);
     if (!action) return;
     if (!isLegal(state, action)) return;
-    // For a tile placement, warn if completion-bonus coins will overflow storage and be lost.
-    if (action.type === ActionType.PlaceTile) {
-      const { max, actual } = placeTileCoins(state, action);
-      if (max > actual) setNote(`Heads up: ${max - actual} earned coin(s) won't fit and will be lost.`);
-    }
     act(action);
   };
 
@@ -369,31 +357,6 @@ export function Game() {
         />
       </section>
 
-      {/* The current player's action bar: payment status + pass. */}
-      {phase === Phase.Playing && (
-        <section className="actionbar">
-          {sel.mode === 'idle' ? (
-            <span className="hint">
-              Click a stored tile or garden expansion to start placing it, draft above, or pass.
-            </span>
-          ) : (
-            <span className="placing">
-              Placing{' '}
-              {placedTile ? (
-                <TileFace tile={placedTile} size={22} />
-              ) : (
-                placedExpansion && <em>{expansionLabel(placedExpansion)} expansion</em>
-              )}{' '}
-              — cost {cost}: pay {need} more ({paid}/{need} selected). Then click a highlighted
-              cell.{' '}
-              <button onClick={resetSelection}>Cancel</button>
-            </span>
-          )}
-        </section>
-      )}
-
-      {note && <p className="note">{note}</p>}
-
       <section className="players">
         {state.players.map((player, i) => (
           <PlayerPanel
@@ -406,11 +369,13 @@ export function Game() {
             paySecs={paySecs}
             placedTile={i === state.currentPlayer ? placedTile : null}
             placedExpansion={i === state.currentPlayer ? placedExpansion : null}
+            need={i === state.currentPlayer ? need : 0}
             legalTargets={i === state.currentPlayer ? legalTargets : new Set()}
             onPass={() => act({ type: ActionType.Pass })}
             onTileItem={clickTileItem}
             onExpansionItem={clickExpansionItem}
             onCell={clickCell}
+            onCancel={resetSelection}
           />
         ))}
       </section>
@@ -442,6 +407,7 @@ function DraftablePiece({
   symbol,
   face,
   dimmed,
+  fill = false,
   draftable,
   onDraft,
   onPreview,
@@ -451,6 +417,7 @@ function DraftablePiece({
   symbol: Symbol;
   face: ReactNode; // the visual (a TileFace or ExpansionFace)
   dimmed: boolean;
+  fill?: boolean; // stretch the piece to fill its pile frame (a takeable expansion)
   draftable: ReadonlySet<string>;
   onDraft: (attr: Attribute) => void;
   onPreview: (attr: Attribute | null) => void;
@@ -500,7 +467,7 @@ function DraftablePiece({
 
   return (
     <span
-      className={`draft-tile${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}${
+      className={`draft-tile${fill ? ' pile-fill' : ''}${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}${
         solo && soloEnabled ? ' clickable' : ''
       }`}
       onMouseEnter={() => {
@@ -512,9 +479,13 @@ function DraftablePiece({
     >
       {face}
       <span
-        className="tile-popup"
+        className={`tile-popup${fill ? ' tile-popup-over' : ''}`}
         ref={popupRef}
-        style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
+        style={{
+          transform: fill
+            ? `translate(calc(-50% + ${shift}px), -50%)`
+            : `translateX(calc(-50% + ${shift}px))`,
+        }}
       >
         {solo ? (
           <button
@@ -579,21 +550,14 @@ function CentralArea({
     preview === null ||
     (preview.kind === 'colour' ? t.colour === preview.colour : t.symbol === preview.symbol);
 
-  // Every tile currently in the central area, plus the takeable (emptied) expansions — the pool a
-  // draft draws from, and the basis for the per-attribute counts shown in each popup. Drafting an
-  // attribute sweeps up BOTH the matching tiles and the matching takeable expansions, so the count
-  // must include expansions too.
-  const allTiles: Tile[] = [];
-  if (central.top) for (const t of central.top.tiles) if (t) allTiles.push(t);
-  for (const d of central.open) for (const t of d.tiles) if (t) allTiles.push(t);
-  const takeableExpansions: Tile[] = central.open
-    .filter((d) => !d.tiles.some(Boolean) && d.expansion?.identity)
-    .map((d) => d.expansion!.identity!);
-
+  // The per-attribute count shown in each popup must equal what a draft of that attribute would
+  // actually take. A draft takes one of each DISTINCT matching tile (identical copies collapse to a
+  // single combo) plus every matching takeable (emptied) expansion. Reuse the engine's draftPlan so
+  // the displayed count never diverges from the real draft — e.g. two identical orange butterflies
+  // count as one, not two.
   const countFor = (attr: Attribute): number => {
-    const match = (t: Tile) =>
-      attr.kind === 'colour' ? t.colour === attr.colour : t.symbol === attr.symbol;
-    return allTiles.filter(match).length + takeableExpansions.filter(match).length;
+    const { combos, expansions } = draftPlan(state, attr);
+    return combos.length + expansions.length;
   };
 
   // A draft is only offered during play; otherwise pieces are plain (non-interactive) faces. A
@@ -621,11 +585,12 @@ function CentralArea({
   // A takeable expansion is drafted the same way as a tile (by its identity's colour or symbol).
   // A spent pile (null expansion — its expansion already taken) renders empty, leaving only the
   // rosette outline so the pile keeps its slot.
+  // Rendered as a direct child of `.display` (not inside `.tiles`) so the rosette can fill the frame.
   const renderExpansion = (expansion: Expansion | null, key: number) => {
     if (expansion === null) return <span key={key} className="pile-spent" aria-label="empty pile" />;
-    const face = <ExpansionFace expansion={expansion} size={20} />;
+    const face = <ExpansionFace expansion={expansion} fill />;
     const id = expansion.identity;
-    if (!canDraft || !id) return <span key={key}>{face}</span>;
+    if (!canDraft || !id) return <span key={key} className="pile-fill">{face}</span>;
     return (
       <DraftablePiece
         key={key}
@@ -633,6 +598,7 @@ function CentralArea({
         symbol={id.symbol}
         face={face}
         dimmed={!matchesPreview(id)}
+        fill
         draftable={draftable}
         onDraft={onDraft}
         onPreview={setPreview}
@@ -654,13 +620,97 @@ function CentralArea({
       {central.open.map((d, i) => (
         <div className="display" key={i}>
           <ExpansionOutline />
-          <div className="tiles">
-            {d.tiles.some(Boolean)
-              ? d.tiles.map((t, j) => renderTile(t, j))
-              : renderExpansion(d.expansion, 0)}
-          </div>
+          {d.tiles.some(Boolean) ? (
+            <div className="tiles">{d.tiles.map((t, j) => renderTile(t, j))}</div>
+          ) : (
+            renderExpansion(d.expansion, 0)
+          )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// The floating payment dock shown above a player's storage while they assemble a placement. It
+// holds the chosen tile/expansion in its lead slot, followed by one slot per payment piece the cost
+// requires (cost − 1; a cost-1 item shows no payment slots). Filled slots mirror the pieces the
+// player has selected from storage; clicking a filled slot deselects that piece. The dock holds NO
+// rules — the indices it reports map straight back to the storage selection in Game.
+function PaymentDock({
+  placedTile,
+  placedExpansion,
+  need,
+  tileArea,
+  expansions,
+  payTiles,
+  paySecs,
+  onUnselectTile,
+  onUnselectExpansion,
+  onCancel,
+}: {
+  placedTile: Tile | null;
+  placedExpansion: Expansion | null;
+  need: number;
+  tileArea: readonly StorageItem[];
+  expansions: readonly Expansion[];
+  payTiles: ReadonlySet<number>;
+  paySecs: ReadonlySet<number>;
+  onUnselectTile: (i: number) => void;
+  onUnselectExpansion: (i: number) => void;
+  onCancel: () => void;
+}) {
+  const tileIdxs = [...payTiles].sort((a, b) => a - b);
+  const secIdxs = [...paySecs].sort((a, b) => a - b);
+  const filled = tileIdxs.length + secIdxs.length;
+  const empties = Math.max(0, need - filled);
+
+  return (
+    <div className="payment-dock">
+      <span className="dock-chosen" aria-label="item being placed">
+        {placedTile ? (
+          <TileFace tile={placedTile} size={56} />
+        ) : (
+          placedExpansion && <ExpansionFace expansion={placedExpansion} size={16} />
+        )}
+      </span>
+      {need > 0 && (
+        <span className="dock-slots">
+          {tileIdxs.map((i) => {
+            const item = tileArea[i];
+            if (!item) return null;
+            return (
+              <button key={`t${i}`} className="dock-slot filled" onClick={() => onUnselectTile(i)}>
+                {item.kind === 'coin' ? (
+                  <CoinFace size={48} />
+                ) : (
+                  <TileFace tile={item.tile} size={48} />
+                )}
+              </button>
+            );
+          })}
+          {secIdxs.map((i) => {
+            const expansion = expansions[i];
+            if (!expansion) return null;
+            return (
+              <button
+                key={`e${i}`}
+                className="dock-slot filled"
+                onClick={() => onUnselectExpansion(i)}
+              >
+                <ExpansionFace expansion={expansion} size={14} />
+              </button>
+            );
+          })}
+          {Array.from({ length: empties }).map((_, k) => (
+            <span key={`empty-${k}`} className="dock-slot empty" aria-hidden="true">
+              <TileSlot size={48} />
+            </span>
+          ))}
+        </span>
+      )}
+      <button className="dock-cancel" onClick={onCancel}>
+        Cancel
+      </button>
     </div>
   );
 }
@@ -674,11 +724,13 @@ function PlayerPanel({
   paySecs,
   placedTile,
   placedExpansion,
+  need,
   legalTargets,
   onPass,
   onTileItem,
   onExpansionItem,
   onCell,
+  onCancel,
 }: {
   id: number;
   player: PlayerState;
@@ -688,12 +740,15 @@ function PlayerPanel({
   paySecs: ReadonlySet<number>;
   placedTile: Tile | null;
   placedExpansion: Expansion | null;
+  need: number;
   legalTargets: ReadonlySet<string>;
   onPass: () => void;
   onTileItem: (i: number) => void;
   onExpansionItem: (i: number) => void;
   onCell: (slot: SlotId, dir: Direction) => void;
+  onCancel: () => void;
 }) {
+  const placing = active && sel.mode !== 'idle' && (placedTile !== null || placedExpansion !== null);
   return (
     <div className={`player${active ? ' active' : ''}`}>
       <div className="player-header">
@@ -715,27 +770,53 @@ function PlayerPanel({
         onCell={onCell}
       />
 
-      <div className="storage">
-        <div className="items tile-items">
-          {player.storage.tileArea.map((item, i) => {
+      {/* While placing, a floating dock above the storage holds the chosen item and one slot per
+          payment piece. Selecting a piece moves it from the storage into a dock slot. */}
+      <div className="storage-wrap">
+        {placing && (
+          <PaymentDock
+            placedTile={placedTile}
+            placedExpansion={placedExpansion}
+            need={need}
+            tileArea={player.storage.tileArea}
+            expansions={player.storage.expansions}
+            payTiles={payTiles}
+            paySecs={paySecs}
+            onUnselectTile={onTileItem}
+            onUnselectExpansion={onExpansionItem}
+            onCancel={onCancel}
+          />
+        )}
+        <div className="storage">
+          <div className="items tile-items">
+            {player.storage.tileArea.map((item, i) => {
+              // A selected item (the chosen tile, or a chosen payment) is "moved" to the dock: its
+              // storage slot is ghosted to an empty placeholder but stays clickable to deselect.
               const isPlaced = active && sel.mode === 'tile' && sel.idx === i;
-              const isPay = active && payTiles.has(i);
-              const cls = `item${isPlaced ? ' placed' : ''}${isPay ? ' pay' : ''}`;
+              const ghost = isPlaced || (active && payTiles.has(i));
               if (item.kind === 'coin') {
+                // A coin is only actionable as payment, so it shows no hover state unless the player
+                // is mid-placement (a tile or expansion is selected, awaiting its payment).
+                const arranging = sel.mode !== 'idle';
                 return (
                   <button
                     key={i}
-                    className={`${cls} coin`}
+                    className={`item coin${ghost ? ' ghost' : ''}${arranging ? '' : ' inert'}`}
                     disabled={!active}
                     onClick={() => onTileItem(i)}
                   >
-                    <CoinFace size={60} />
+                    {ghost ? <TileSlot size={60} /> : <CoinFace size={60} />}
                   </button>
                 );
               }
               return (
-                <button key={i} className={cls} disabled={!active} onClick={() => onTileItem(i)}>
-                  <TileFace tile={item.tile} size={60} />
+                <button
+                  key={i}
+                  className={`item${ghost ? ' ghost' : ''}`}
+                  disabled={!active}
+                  onClick={() => onTileItem(i)}
+                >
+                  {ghost ? <TileSlot size={60} /> : <TileFace tile={item.tile} size={60} />}
                 </button>
               );
             })}
@@ -744,15 +825,19 @@ function PlayerPanel({
                 <TileSlot size={60} />
               </span>
             ))}
-        </div>
-        <div className="items expansion-items">
+          </div>
+          <div className="items expansion-items">
             {player.storage.expansions.map((s, i) => {
               const isPlaced = active && sel.mode === 'expansion' && sel.idx === i;
-              const isPay = active && paySecs.has(i);
-              const cls = `item expansion${isPlaced ? ' placed' : ''}${isPay ? ' pay' : ''}`;
+              const ghost = isPlaced || (active && paySecs.has(i));
               return (
-                <button key={i} className={cls} disabled={!active} onClick={() => onExpansionItem(i)}>
-                  <ExpansionFace expansion={s} size={18} />
+                <button
+                  key={i}
+                  className={`item expansion${ghost ? ' ghost' : ''}`}
+                  disabled={!active}
+                  onClick={() => onExpansionItem(i)}
+                >
+                  <ExpansionFace expansion={ghost ? { identity: null } : s} size={18} />
                 </button>
               );
             })}
@@ -763,6 +848,7 @@ function PlayerPanel({
                 </span>
               ),
             )}
+          </div>
         </div>
       </div>
 

@@ -162,6 +162,20 @@ button:disabled {
   place-content: center;
   z-index: 1;
 }
+/* A takeable-expansion pile fills the frame, overlaying the rosette outline (also at inset:0). The
+   `.draft-tile` compound selector outranks the plain `.draft-tile` rule defined later in this file. */
+.pile-fill,
+.draft-tile.pile-fill {
+  position: absolute;
+  inset: 0;
+  display: block;
+  z-index: 1;
+}
+.expansion-face-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
 /* An emptied slot where a tile was drafted away — holds its place in the 2×2 grid. */
 .tile-blank {
@@ -200,6 +214,10 @@ button:disabled {
 }
 .draft-tile.open .tile-popup {
   display: flex;
+}
+/* For a takeable expansion the popup floats centred over the piece, not dropped below it. */
+.tile-popup-over {
+  top: 50%;
 }
 .draft-chip {
   border: none;
@@ -243,9 +261,6 @@ button:disabled {
   border: 1px solid #d3e4ca;
   padding: 10px 16px;
   margin: 12px 0;
-}
-.actionbar .placing {
-  flex: 1;
 }
 .pass {
   position: absolute;
@@ -373,13 +388,93 @@ button:disabled {
   font-size: 2.8rem;
   line-height: 1;
 }
-.item.placed {
-  border-color: #2f9e44;
-  box-shadow: 0 0 0 2px #b8e6bb;
+/* A coin is only useful as payment; outside a placement it's inert, so it gets no hover affordance. */
+.item.inert:not(:disabled) {
+  cursor: default;
 }
-.item.pay {
+.item.inert:not(:disabled):hover {
+  border-color: transparent;
+  background: transparent;
+}
+/* A selected item (chosen tile or a chosen payment piece) is shown in the floating dock instead;
+   its storage slot is ghosted to an empty placeholder, but stays clickable to deselect it. */
+.item.ghost:not(:disabled):hover {
   border-color: #f59e0b;
-  box-shadow: 0 0 0 2px #fde68a;
+  background: #fff7e6;
+}
+
+/* --- payment dock --- */
+/* Anchors the floating dock just above the storage without taking layout space. */
+.storage-wrap {
+  position: relative;
+}
+.payment-dock {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 2px solid #2f9e44;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  padding: 8px 10px;
+}
+/* The chosen tile/expansion sits first, framed to read as "this is what you're placing". */
+.dock-chosen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 2px solid #2f9e44;
+  border-radius: 8px;
+  background: #eaf7ec;
+}
+.dock-slots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dock-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 1px dashed #bcd6ad;
+  border-radius: 8px;
+  background: #f6faf3;
+}
+/* A filled payment slot is solid and warm-bordered; clicking it deselects the piece. */
+.dock-slot.filled {
+  border-style: solid;
+  border-color: #f59e0b;
+  background: #fff7e6;
+  cursor: pointer;
+}
+.dock-slot.filled:hover {
+  border-color: #d97706;
+}
+.dock-slot.empty {
+  cursor: default;
+}
+/* Reuses the chunky square button look from the top bar / pass button. */
+.dock-cancel {
+  border: 2px solid #2f5733;
+  border-radius: 0;
+  background: #fff;
+  color: #1f3a26;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+}
+.dock-cancel:hover {
+  background: #f3f8ef;
 }
 
 /* --- load-state dialog (native <dialog>) --- */

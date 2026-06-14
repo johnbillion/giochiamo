@@ -197,15 +197,28 @@ export function CoinFace({ size = 34 }: { size?: number }) {
 // colour + symbol); the other five are empty. A starter expansion (no identity) has all six empty.
 const EXPANSION_IDENTITY_SLOT = 2; // which ring slot shows the identity tile (top-left)
 
-export function ExpansionFace({ expansion, size = 18 }: { expansion: Expansion; size?: number }) {
+// `fill` makes the SVG stretch to fill its container (matching ExpansionOutline) instead of
+// rendering at a fixed pixel size — used for a central pile, where the rosette should fill the frame.
+export function ExpansionFace({
+  expansion,
+  size = 18,
+  fill = false,
+}: {
+  expansion: Expansion;
+  size?: number;
+  fill?: boolean;
+}) {
   const id = expansion.identity;
   const r = size; // circumradius of each hex in the rosette
+  // Draw the identity hex last so its darker border is never overdrawn by an adjacent hex's lighter
+  // one — it sits on top on all sides (same paint-order trick the board uses for placed expansions).
   const cells = DIR_AXIAL.map(([q, rr], i) => {
     const [cx, cy] = axialToPixel(q, rr, r);
     return { cx, cy, i };
-  });
+  }).sort((a, b) => Number(a.i === EXPANSION_IDENTITY_SLOT) - Number(b.i === EXPANSION_IDENTITY_SLOT));
   const halfW = (r * Math.sqrt(3)) / 2;
-  const pad = 1.5;
+  // Match ExpansionOutline's relative padding (0.2·R) so the rosette overlays the frame exactly.
+  const pad = fill ? r * 0.2 : 1.5;
   const minX = Math.min(...cells.map((c) => c.cx)) - halfW - pad;
   const maxX = Math.max(...cells.map((c) => c.cx)) + halfW + pad;
   const minY = Math.min(...cells.map((c) => c.cy)) - r - pad;
@@ -214,10 +227,9 @@ export function ExpansionFace({ expansion, size = 18 }: { expansion: Expansion; 
   const h = maxY - minY;
   return (
     <svg
-      className="expansion-face"
+      className={fill ? 'expansion-face expansion-face-fill' : 'expansion-face'}
       viewBox={`${minX.toFixed(2)} ${minY.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`}
-      width={w.toFixed(2)}
-      height={h.toFixed(2)}
+      {...(fill ? { preserveAspectRatio: 'xMidYMid meet' } : { width: w.toFixed(2), height: h.toFixed(2) })}
       role="img"
       aria-label={`${expansionLabel(expansion)} expansion`}
     >
