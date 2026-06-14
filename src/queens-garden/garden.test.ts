@@ -51,9 +51,17 @@ describe('garden topology — tile adjacency', () => {
     expect(adj).toContainEqual({ slot: 0, dir: 3 });
   });
 
-  it('crosses the shared edge to the opposite direction of the neighbour', () => {
-    // The centre's tile at direction 0 touches ring slot 1's tile at direction 3.
-    expect(adjacentPositions({ slot: 0, dir: 0 })).toContainEqual({ slot: 1, dir: 3 });
+  it('crosses a junction to the touching petals of a neighbouring rosette', () => {
+    // The centre's east petal (dir 4) touches the right rosette (slot 1) at its west petal (dir 1).
+    expect(adjacentPositions({ slot: 0, dir: 4 })).toContainEqual({ slot: 1, dir: 1 });
+  });
+
+  it("treats a rosette's outward-facing petals as isolated across the junction", () => {
+    // The right rosette's far (NE) petal touches nothing in the centre — only its own neighbours.
+    expect(adjacentPositions({ slot: 1, dir: 3 })).toEqual([
+      { slot: 1, dir: 2 },
+      { slot: 1, dir: 4 },
+    ]);
   });
 
   it('is symmetric across all 42 positions', () => {

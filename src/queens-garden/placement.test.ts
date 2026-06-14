@@ -169,14 +169,15 @@ describe('place tile', () => {
     expect(isLegal(s0, action)).toBe(true);
   });
 
-  it('rejects a mono-colour run that bends across a expansion boundary to join identical tiles', () => {
+  it('rejects a mono-colour run that bends across a rosette boundary to join identical tiles', () => {
     // A red run turns a corner the old fixed-line model could not see. The centre holds
-    // dir5 = red/tree and dir0 = red/bird; placing red/tree across the shared edge on slot 1
-    // (its dir3 faces the centre's dir0) forms one red run
-    //   slot1·dir3 red/tree — centre·dir0 red/bird — centre·dir5 red/tree
-    // joining two red/trees. No single expansion-ring or junction-ring contains all three.
+    // dir5 = red/tree and dir4 = red/bird; the centre's east petal (dir4) touches the right
+    // rosette (slot 1) at its west petal (dir1) across the junction. Placing red/tree there forms
+    // one red run
+    //   slot1·dir1 red/tree — centre·dir4 red/bird — centre·dir5 red/tree
+    // joining two red/trees. No single rosette-ring or junction-ring contains all three.
     const garden: Garden = [
-      { tiles: [tile('red', 'bird'), null, null, null, null, tile('red', 'tree')] },
+      { tiles: [null, null, null, null, tile('red', 'bird'), tile('red', 'tree')] },
       { tiles: [null, null, null, null, null, null] }, // a placed (empty) frame on slot 1
       null,
       null,
@@ -185,7 +186,7 @@ describe('place tile', () => {
       null,
     ];
     const s0 = makeState(garden, { tileArea: [tileItem(tile('red', 'tree'))], expansions: [] });
-    const action = { type: ActionType.PlaceTile, tile: tile('red', 'tree'), slot: 1, dir: 3, payment: NO_PAYMENT } as const;
+    const action = { type: ActionType.PlaceTile, tile: tile('red', 'tree'), slot: 1, dir: 1, payment: NO_PAYMENT } as const;
     expect(isLegal(s0, action)).toBe(false);
   });
 });
