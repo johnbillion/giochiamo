@@ -59,9 +59,15 @@ button:disabled {
   padding: 7px 16px;
   transition: background 0.05s ease;
 }
-.topbar button:hover,
-.pass:hover {
+.topbar button:not(:disabled):hover,
+.pass:not(:disabled):hover {
   background: #f3f8ef;
+}
+.topbar button:disabled,
+.pass:disabled {
+  border-color: #b9c3ba;
+  background: #eceeec;
+  color: #9aa49b;
 }
 
 /* --- shared --- */
@@ -158,6 +164,11 @@ button:disabled {
 .expansion-face {
   display: inline-block;
   vertical-align: middle;
+  cursor: default;
+}
+/* The identity glyph is an SVG <text> node, which would otherwise show an I-beam on hover. */
+.expansion-face text {
+  cursor: inherit;
 }
 
 /* an empty storage slot: a faint, flat hexagon placeholder (no edge shadow) */
@@ -334,33 +345,36 @@ button:disabled {
 .draft-banner {
   position: absolute;
   top: 90%;
-  left: 10px;
-  right: 10px;
+  left: 20px;
+  right: 20px;
   margin-top: 8px;
+  color: #fff;
   z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 8px 14px;
-  background: #eef7f0;
+  background: #2f7d4f;
   border: 1px solid #2f7d4f;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 .draft-cancel {
   border: 1px solid #2f7d4f;
-  background: #fff;
+  background: rgba(255,255,255,0.8);
   padding: 5px 14px;
   cursor: pointer;
   white-space: nowrap;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: bold;
 }
 .draft-cancel:hover {
-  background: #2f7d4f;
-  color: #fff;
+  background: rgba(255,255,255,1);
 }
 .tile-popup {
   position: absolute;
-  top: 100%;
+  top: 80%;
   left: 50%;
   display: none;
   gap: 0;
@@ -395,7 +409,11 @@ button:disabled {
   border-left: 1px solid #d3e4ca;
 }
 .draft-chip:not(:disabled):hover {
-  filter: brightness(1.08);
+  filter: brightness(1.3);
+}
+/* brightness does nothing to the white symbol chip — give it a light grey wash instead. */
+.draft-chip:not(.draft-chip-colour):not(:disabled):hover {
+  background: #dde4d6;
 }
 .draft-chip.draft-chip-colour:not(:disabled) {
   color: #fff;

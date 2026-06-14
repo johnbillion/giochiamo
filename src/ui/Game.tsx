@@ -14,7 +14,9 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
 import {
   applyAction,
@@ -124,6 +126,8 @@ export function Game() {
   const [paySecs, setPaySecs] = useState<ReadonlySet<number>>(new Set());
   // Every applied action, in order — the seed + this log replay the game deterministically.
   const [log, setLog] = useState<readonly Action[]>([]);
+  // A stack of full state snapshots, one per applied action — the top is restored on Undo.
+  const [history, setHistory] = useState<readonly State[]>([]);
   const [copied, setCopied] = useState(false);
   const [loadText, setLoadText] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -153,6 +157,7 @@ export function Game() {
     setSeed(next);
     setState(createInitialState(PLAYER_COUNT, next));
     setLog([]);
+    setHistory([]);
     resetSelection();
   };
 
@@ -176,6 +181,7 @@ export function Game() {
       const parsed = parseLoadedState(loadText);
       setState(parsed);
       setLog([]);
+      setHistory([]);
       setLoadError(null);
       resetSelection();
       loadDialog.current?.close();
@@ -185,8 +191,18 @@ export function Game() {
   };
 
   const act = (action: Action) => {
+    setHistory((h) => [...h, state]);
     submit(dispatch, action);
     setLog((l) => [...l, action]);
+    resetSelection();
+  };
+
+  // Pop the top state snapshot and restore it, rolling back the last applied action.
+  const undo = () => {
+    if (history.length === 0) return;
+    setState(history[history.length - 1]!);
+    setHistory((h) => h.slice(0, -1));
+    setLog((l) => l.slice(0, -1));
     resetSelection();
   };
 
@@ -329,6 +345,9 @@ export function Game() {
             </>
           )}
         </div>
+        <button onClick={undo} disabled={history.length === 0}>
+          Undo
+        </button>
         <button onClick={copyState}>{copied ? 'Copied!' : 'Copy state'}</button>
         <button onClick={openLoadDialog}>Load state</button>
         <button onClick={newGame}>New game</button>
@@ -341,6 +360,12 @@ export function Game() {
           className="load-textarea"
           value={loadText}
           onChange={(e) => setLoadText(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && loadText.trim()) {
+              e.preventDefault();
+              loadState();
+            }
+          }}
           placeholder="{ …game state JSON… }"
         />
         {loadError && <p className="note">⚠ {loadError}</p>}
@@ -772,6 +797,43 @@ function CentralArea({
     );
   };
 
+  // A pile of tiles framed by its rosette outline. `rotationIndex` seeds the outline's jitter (0 for
+  // the freshly revealed top pile, `i + 1` for each open pile); `sourceFor` maps a slot to the draft
+  // source so the same markup serves both the top and open areas.
+  const renderTilePile = (
+    rotationIndex: number,
+    tiles: readonly (Tile | null)[],
+    sourceFor: (slot: number) => DraftSource,
+  ) => (
+    <>
+      <ExpansionOutline rotate={pileRotation(`${jitterSalt}:${state.round}:${rotationIndex}`)} />
+      <div className="tiles">{tiles.map((t, j) => renderTile(t, j, sourceFor(j)))}</div>
+    </>
+  );
+
+  // TEMP debug: pile id + the colour/symbol of the expansion underneath each display.
+  const debugDisplay = (id: number, expansion: Expansion | null) => {
+    const ident = expansion?.identity;
+    return (
+      <div
+        className="debug-pile"
+        style={{
+          position: 'absolute',
+          bottom: -18,
+          left: 0,
+          right: 0,
+          textAlign: 'center',
+          fontSize: 11,
+          fontFamily: 'monospace',
+          color: 'magenta',
+          pointerEvents: 'none',
+        }}
+      >
+        #{id} {ident ? `${ident.colour}/${ident.symbol}` : '∅'}
+      </div>
+    );
+  };
+
   return (
     <>
       {draftSel && activePending && (
@@ -799,29 +861,21 @@ function CentralArea({
           className={`display${revealing ? ' display-reveal' : ''}`}
           key={`top-${central.pile.length}`}
         >
-          <ExpansionOutline rotate={pileRotation(`${jitterSalt}:${state.round}:0`)} />
-          <div className="tiles">
-            {central.top.tiles.map((t, i) => renderTile(t, i, { area: 'top', slot: i }))}
-          </div>
+          {renderTilePile(0, central.top.tiles, (slot) => ({ area: 'top', slot }))}
+          {debugDisplay(0, central.top.expansion)}
         </div>
       )}
       {central.open.map((d, i) => {
         const hasTiles = d.tiles.some(Boolean);
-        // The rosette outline frames a pile's tiles. A takeable expansion fills the frame with its
-        // own rosette (so the outline behind would be redundant), and a spent pile (expansion already
-        // taken) should read as empty — so only tile piles draw the outline.
+        // A tile pile draws its rosette outline; a takeable expansion fills the frame with its own
+        // rosette (so the outline behind would be redundant), and a spent pile (expansion already
+        // taken) should read as empty.
         return (
           <div className="display" key={i}>
-            {hasTiles && (
-              <ExpansionOutline rotate={pileRotation(`${jitterSalt}:${state.round}:${i + 1}`)} />
-            )}
-            {hasTiles ? (
-              <div className="tiles">
-                {d.tiles.map((t, j) => renderTile(t, j, { area: 'open', index: i, slot: j }))}
-              </div>
-            ) : (
-              renderExpansion(d.expansion, 0, `open${i}`)
-            )}
+            {hasTiles
+              ? renderTilePile(i + 1, d.tiles, (slot) => ({ area: 'open', index: i, slot }))
+              : renderExpansion(d.expansion, 0, `open${i}`)}
+            {debugDisplay(i + 1, d.expansion)}
           </div>
         );
       })}
@@ -1070,6 +1124,113 @@ function PlayerPanel({
   );
 }
 
+// A single garden cell: the hexagon plus its optional symbol glyph, and the placement click/hover
+// wiring. Given the cell's own state and the current hover context (the previewed tile/identity,
+// whether this is the hovered cell, and whether it's elsewhere in the hovered rosette) it resolves
+// its own fill/stroke/glyph, so all per-cell rendering decisions live here. The colour and symbol
+// *names* arrive via the tile objects; this component maps them to the display hex and glyph.
+function GardenCell({
+  cell,
+  r,
+  preview,
+  isPreviewCell,
+  inHoveredRosette,
+  onCell,
+  setHovered,
+}: {
+  cell: {
+    slot: number;
+    dir: number;
+    cx: number;
+    cy: number;
+    tile: Tile | null;
+    hasExpansion: boolean;
+    legal: boolean;
+  };
+  r: number;
+  preview: Tile | null;
+  isPreviewCell: boolean;
+  inHoveredRosette: boolean;
+  onCell: (slot: SlotId, dir: Direction) => void;
+  setHovered: Dispatch<SetStateAction<string | null>>;
+}) {
+  const key = `${cell.slot}:${cell.dir}`;
+
+  // Fill/stroke mirror the cell states: legal target, empty slot of a placed expansion, an
+  // unplaced expansion slot, or a filled tile — with the hover preview layered on top.
+  let fill: string;
+  let stroke: string;
+  let strokeWidth = 1.5;
+  let glyph: string | null = cell.tile ? SYMBOL_GLYPH[cell.tile.symbol] : null;
+  let className = 'gcell';
+  if (preview) {
+    // Show the actual tile/identity that will be placed here.
+    fill = COLOUR_HEX[preview.colour];
+    stroke = '#15803d';
+    strokeWidth = 2.5;
+    glyph = SYMBOL_GLYPH[preview.symbol];
+    className = 'gcell legal';
+  } else if (isPreviewCell) {
+    // Hovered cell of a blank-identity expansion: an empty-frame preview, no glyph.
+    fill = '#bfe0a8';
+    stroke = '#15803d';
+    strokeWidth = 2.5;
+    className = 'gcell legal';
+  } else if (inHoveredRosette) {
+    // The rest of the rosette the expansion is about to drop into — drawn in the same soft
+    // green an empty slot of a placed expansion takes, so the hover previews the placed result.
+    fill = '#bfe0a8';
+    stroke = '#15803d';
+    strokeWidth = 2;
+    className = cell.legal ? 'gcell legal' : 'gcell';
+  } else if (cell.legal) {
+    fill = '#86efac';
+    stroke = '#15803d';
+    strokeWidth = 2.5;
+    className = 'gcell legal';
+  } else if (!cell.hasExpansion) {
+    fill = '#eaf3e2';
+    stroke = '#cfe2c0';
+  } else if (!cell.tile) {
+    fill = '#bfe0a8';
+    stroke = '#7fb15f';
+  } else {
+    fill = COLOUR_HEX[cell.tile.colour];
+    stroke = 'rgba(0, 0, 0, 0.4)';
+  }
+
+  return (
+    <g
+      className={className}
+      // Placed tiles get a tiny fixed tilt (keyed by their permanent slot:dir) for a
+      // hand-placed look; empty/preview cells stay square so the grid reads cleanly.
+      transform={cell.tile ? `rotate(${jitterDegrees(key)} ${cell.cx} ${cell.cy})` : undefined}
+      onClick={cell.legal ? () => onCell(cell.slot as SlotId, cell.dir as Direction) : undefined}
+      onMouseEnter={cell.legal ? () => setHovered(key) : undefined}
+      onMouseLeave={cell.legal ? () => setHovered((h) => (h === key ? null : h)) : undefined}
+    >
+      <polygon
+        points={hexPoints(cell.cx, cell.cy, r)}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+      />
+      {glyph && (
+        <text
+          className="gglyph"
+          x={cell.cx}
+          y={cell.cy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={r}
+        >
+          {glyph}
+        </text>
+      )}
+    </g>
+  );
+}
+
 function Garden({
   player,
   active,
@@ -1166,78 +1327,17 @@ function Garden({
           ? placedTile ?? placedExpansion?.identity ?? null
           : null;
 
-        // Fill/stroke mirror the old cell states: legal target, empty slot of a placed expansion,
-        // an unplaced expansion slot, or a filled tile — with the hover preview layered on top.
-        let fill: string;
-        let stroke: string;
-        let strokeWidth = 1.5;
-        let glyph: string | null = c.tile ? SYMBOL_GLYPH[c.tile.symbol] : null;
-        let className = 'gcell';
-        if (preview) {
-          // Show the actual tile/identity that will be placed here.
-          fill = COLOUR_HEX[preview.colour];
-          stroke = '#15803d';
-          strokeWidth = 2.5;
-          glyph = SYMBOL_GLYPH[preview.symbol];
-          className = 'gcell legal';
-        } else if (isPreviewCell) {
-          // Hovered cell of a blank-identity expansion: an empty-frame preview, no glyph.
-          fill = '#bfe0a8';
-          stroke = '#15803d';
-          strokeWidth = 2.5;
-          className = 'gcell legal';
-        } else if (inHoveredRosette) {
-          // The rest of the rosette the expansion is about to drop into — drawn in the same soft
-          // green an empty slot of a placed expansion takes, so the hover previews the placed result.
-          fill = '#bfe0a8';
-          stroke = '#15803d';
-          strokeWidth = 2;
-          className = c.legal ? 'gcell legal' : 'gcell';
-        } else if (c.legal) {
-          fill = '#86efac';
-          stroke = '#15803d';
-          strokeWidth = 2.5;
-          className = 'gcell legal';
-        } else if (!c.hasExpansion) {
-          fill = '#eaf3e2';
-          stroke = '#cfe2c0';
-        } else if (!c.tile) {
-          fill = '#bfe0a8';
-          stroke = '#7fb15f';
-        } else {
-          fill = COLOUR_HEX[c.tile.colour];
-          stroke = 'rgba(0, 0, 0, 0.4)';
-        }
         return (
-          <g
+          <GardenCell
             key={key}
-            className={className}
-            // Placed tiles get a tiny fixed tilt (keyed by their permanent slot:dir) for a
-            // hand-placed look; empty/preview cells stay square so the grid reads cleanly.
-            transform={c.tile ? `rotate(${jitterDegrees(key)} ${c.cx} ${c.cy})` : undefined}
-            onClick={c.legal ? () => onCell(c.slot as SlotId, c.dir as Direction) : undefined}
-            onMouseEnter={c.legal ? () => setHovered(key) : undefined}
-            onMouseLeave={c.legal ? () => setHovered((h) => (h === key ? null : h)) : undefined}
-          >
-            <polygon
-              points={hexPoints(c.cx, c.cy, R)}
-              fill={fill}
-              stroke={stroke}
-              strokeWidth={strokeWidth}
-            />
-            {glyph && (
-              <text
-                className="gglyph"
-                x={c.cx}
-                y={c.cy}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={R}
-              >
-                {glyph}
-              </text>
-            )}
-          </g>
+            cell={c}
+            r={R}
+            preview={preview}
+            isPreviewCell={isPreviewCell}
+            inHoveredRosette={inHoveredRosette}
+            onCell={onCell}
+            setHovered={setHovered}
+          />
         );
       })}
     </svg>
