@@ -389,13 +389,6 @@ export function Game() {
               <button onClick={resetSelection}>Cancel</button>
             </span>
           )}
-          <button
-            className="pass"
-            disabled={!available.includes(ActionType.Pass)}
-            onClick={() => act({ type: ActionType.Pass })}
-          >
-            Pass
-          </button>
         </section>
       )}
 
@@ -414,6 +407,7 @@ export function Game() {
             placedTile={i === state.currentPlayer ? placedTile : null}
             placedExpansion={i === state.currentPlayer ? placedExpansion : null}
             legalTargets={i === state.currentPlayer ? legalTargets : new Set()}
+            onPass={() => act({ type: ActionType.Pass })}
             onTileItem={clickTileItem}
             onExpansionItem={clickExpansionItem}
             onCell={clickCell}
@@ -681,6 +675,7 @@ function PlayerPanel({
   placedTile,
   placedExpansion,
   legalTargets,
+  onPass,
   onTileItem,
   onExpansionItem,
   onCell,
@@ -694,6 +689,7 @@ function PlayerPanel({
   placedTile: Tile | null;
   placedExpansion: Expansion | null;
   legalTargets: ReadonlySet<string>;
+  onPass: () => void;
   onTileItem: (i: number) => void;
   onExpansionItem: (i: number) => void;
   onCell: (slot: SlotId, dir: Direction) => void;
@@ -769,6 +765,12 @@ function PlayerPanel({
             )}
         </div>
       </div>
+
+      {active && (
+        <button className="pass" onClick={onPass}>
+          Pass
+        </button>
+      )}
     </div>
   );
 }
@@ -844,9 +846,19 @@ function Garden({
   // rosette (its slot) gets highlighted.
   const hoveredCell = hovered ? cells.find((c) => `${c.slot}:${c.dir}` === hovered && c.legal) : undefined;
 
+  // Paint order: empty sections first, then placed expansions, then legal/preview cells on top — so
+  // an expansion's stronger borders are never overdrawn by an adjacent empty section's lighter one.
+  const renderPriority = (c: Cell): number => {
+    const isPreviewCell = hoveredCell?.slot === c.slot && hoveredCell?.dir === c.dir;
+    const inHoveredRosette = !!placedExpansion && !!hoveredCell && hoveredCell.slot === c.slot;
+    if (c.legal || isPreviewCell || inHoveredRosette) return 2;
+    return c.hasExpansion ? 1 : 0;
+  };
+  const renderCells = [...cells].sort((a, b) => renderPriority(a) - renderPriority(b));
+
   return (
     <svg className="garden" viewBox={viewBox} aria-label="garden board">
-      {cells.map((c) => {
+      {renderCells.map((c) => {
         const key = `${c.slot}:${c.dir}`;
         // Where the about-to-place item would land: the exact cell under the cursor, and — for an
         // expansion — every cell of that rosette's slot.
@@ -875,15 +887,14 @@ function Garden({
           className = 'gcell legal';
         } else if (isPreviewCell) {
           // Hovered cell of a blank-identity expansion: an empty-frame preview, no glyph.
-          fill = '#a5b4fc';
+          fill = '#bfe0a8';
           stroke = '#15803d';
           strokeWidth = 2.5;
           className = 'gcell legal';
         } else if (inHoveredRosette) {
-          // The rest of the rosette the expansion is about to drop into — drawn in the same
-          // purpley-blue an empty slot of a placed expansion takes, so the hover previews the
-          // placed result.
-          fill = '#a5b4fc';
+          // The rest of the rosette the expansion is about to drop into — drawn in the same soft
+          // green an empty slot of a placed expansion takes, so the hover previews the placed result.
+          fill = '#bfe0a8';
           stroke = '#15803d';
           strokeWidth = 2;
           className = c.legal ? 'gcell legal' : 'gcell';
@@ -893,11 +904,11 @@ function Garden({
           strokeWidth = 2.5;
           className = 'gcell legal';
         } else if (!c.hasExpansion) {
-          fill = '#cbd5e1';
-          stroke = '#94a3b8';
+          fill = '#eaf3e2';
+          stroke = '#cfe2c0';
         } else if (!c.tile) {
-          fill = '#a5b4fc';
-          stroke = '#6366f1';
+          fill = '#bfe0a8';
+          stroke = '#7fb15f';
         } else {
           fill = COLOUR_HEX[c.tile.colour];
           stroke = 'rgba(0, 0, 0, 0.4)';

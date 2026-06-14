@@ -1,7 +1,7 @@
 :root {
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
-  color: #1f2937;
+  color: #1f3a26;
 }
 
 * {
@@ -11,7 +11,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f1f5f9;
+  background: #eef5ea;
 }
 
 button {
@@ -44,16 +44,35 @@ button:disabled {
   font-size: 1.05rem;
 }
 
+/* Angular, chunky-bordered buttons echoing the hex board: square corners, a thick
+   dark-green edge, and a hard (blur-free) offset shadow that the button sinks into when pressed. */
+.topbar button,
+.pass {
+  border: 2px solid #2f5733;
+  border-radius: 0;
+  background: #fff;
+  color: #1f3a26;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  transition: background 0.05s ease;
+}
+.topbar button:hover,
+.pass:hover {
+  background: #f3f8ef;
+}
+
 /* --- shared --- */
 .hint {
-  color: #64748b;
+  color: #5f7a55;
   font-size: 0.85rem;
   margin: 4px 0;
 }
 .note {
   background: #fef3c7;
   border: 1px solid #fcd34d;
-  border-radius: 6px;
   padding: 6px 10px;
   font-size: 0.9rem;
 }
@@ -80,15 +99,33 @@ button:disabled {
 
 /* an empty storage slot: a faint, flat hexagon placeholder (no edge shadow) */
 .tile-slot {
-  background: #eef0f3;
+  background: #e7f1e0;
   filter: none;
+}
+
+/* a coin: a lighter silver face inside a darker rim, with a dark-grey glyph */
+.coin-face {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+.coin-face .coin-rim {
+  position: absolute;
+  inset: 0;
+  background: #c08a2e;
+}
+.coin-face .coin-inner {
+  position: absolute;
+  inset: 11%;
+  background: #f3c34e;
+  color: #7c5310;
+  font-weight: 700;
 }
 
 /* --- central area --- */
 .central {
   background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #d3e4ca;
   padding: 12px 16px;
   margin: 12px 0;
 }
@@ -155,11 +192,10 @@ button:disabled {
   gap: 0;
   padding: 0;
   background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #d3e4ca;
+  border-radius: 0;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   z-index: 20;
-  /* Clip the flush-fitting buttons to the popup's rounded outline so only the outer corners curve. */
   overflow: hidden;
 }
 .draft-tile.open .tile-popup {
@@ -170,7 +206,7 @@ button:disabled {
   border-radius: 0;
   padding: 6px 14px;
   background: #fff;
-  color: #1e293b;
+  color: #243a28;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -178,7 +214,7 @@ button:disabled {
 }
 /* A hairline divider where the two buttons meet. */
 .draft-chip + .draft-chip {
-  border-left: 1px solid #e2e8f0;
+  border-left: 1px solid #d3e4ca;
 }
 .draft-chip:not(:disabled):hover {
   filter: brightness(1.08);
@@ -188,12 +224,12 @@ button:disabled {
 }
 /* Yellow's fill is too light for white text — use dark text for legibility. */
 .draft-chip.draft-chip-colour[data-colour='yellow']:not(:disabled) {
-  color: #1e293b;
+  color: #243a28;
 }
 .draft-chip:disabled {
-  background: #f1f5f9 !important;
-  color: #94a3b8;
-  border-color: #e2e8f0;
+  background: #eef5ea !important;
+  color: #86997c;
+  border-color: #d3e4ca;
   filter: grayscale(1) opacity(0.5);
 }
 
@@ -204,8 +240,7 @@ button:disabled {
   gap: 12px;
   flex-wrap: wrap;
   background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #d3e4ca;
   padding: 10px 16px;
   margin: 12px 0;
 }
@@ -213,11 +248,12 @@ button:disabled {
   flex: 1;
 }
 .pass {
-  margin-left: auto;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 6px 16px;
-  background: #fff;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  /* The shared button rule sets border/colour/etc.; here we only float it onto the bottom edge,
+     nudged a little below centre so it sits clear of the panel border. */
+  transform: translate(-50%, 75%);
 }
 
 /* --- players --- */
@@ -227,15 +263,15 @@ button:disabled {
   flex-wrap: wrap;
 }
 .player {
+  position: relative;
   flex: 1 1 360px;
   background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #d3e4ca;
   padding: 12px 16px;
 }
 .player.active {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px #c7d2fe;
+  border-color: #2f9e44;
+  box-shadow: 0 0 0 2px #b8e6bb;
 }
 .player-header {
   display: flex;
@@ -253,21 +289,21 @@ button:disabled {
 }
 .turn-badge {
   font-size: 0.7rem;
-  background: #6366f1;
+  background: #2f9e44;
   color: #fff;
   border-radius: 999px;
   padding: 1px 8px;
 }
 .passed-badge {
   font-size: 0.7rem;
-  background: #94a3b8;
+  background: #86997c;
   color: #fff;
   border-radius: 999px;
   padding: 1px 8px;
 }
 .score {
   font-size: 0.85rem;
-  color: #475569;
+  color: #4a5f44;
   white-space: nowrap;
 }
 
@@ -283,7 +319,7 @@ button:disabled {
 }
 /* Outline a legal target on hover as a placement affordance (legal cells exist only while placing). */
 .gcell.legal:hover polygon {
-  stroke: #6366f1;
+  stroke: #2f9e44;
   stroke-width: 2;
 }
 .gglyph {
@@ -324,8 +360,8 @@ button:disabled {
   display: inline-flex;
 }
 .item:not(:disabled):hover {
-  border-color: #94a3b8;
-  background: #f1f5f9;
+  border-color: #86997c;
+  background: #eef5ea;
 }
 /* a non-interactive empty-slot placeholder, inset to match the .item button box */
 .slot {
@@ -338,8 +374,8 @@ button:disabled {
   line-height: 1;
 }
 .item.placed {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px #c7d2fe;
+  border-color: #2f9e44;
+  box-shadow: 0 0 0 2px #b8e6bb;
 }
 .item.pay {
   border-color: #f59e0b;
@@ -349,7 +385,6 @@ button:disabled {
 /* --- load-state dialog (native <dialog>) --- */
 .load-dialog {
   border: none;
-  border-radius: 10px;
   padding: 16px 20px;
   width: min(640px, 100%);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
@@ -366,7 +401,7 @@ button:disabled {
   height: 280px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.8rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #bcd6ad;
   border-radius: 6px;
   padding: 8px;
   resize: vertical;
@@ -378,7 +413,7 @@ button:disabled {
   margin-top: 10px;
 }
 .modal-actions button {
-  border: 1px solid #cbd5e1;
+  border: 1px solid #bcd6ad;
   border-radius: 6px;
   padding: 6px 16px;
   background: #fff;
@@ -387,8 +422,7 @@ button:disabled {
 /* --- game over --- */
 .gameover {
   background: #fff;
-  border: 2px solid #6366f1;
-  border-radius: 10px;
+  border: 2px solid #2f9e44;
   padding: 12px 16px;
   margin: 12px 0;
 }

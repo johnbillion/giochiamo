@@ -34,6 +34,9 @@ export const SYMBOL_GLYPH: Record<Symbol, string> = {
   lily: '🌷',
 };
 
+// The glyph shown on a coin (wildcard payment piece). Kept as a constant so it can be localised.
+export const COIN_GLYPH = '$';
+
 // The 6 symbols → display names shown in the UI.
 export const SYMBOL_LABEL: Record<Symbol, string> = {
   tree: 'Tree',
@@ -122,7 +125,7 @@ export function ExpansionOutline() {
       preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
     >
-      <polygon points={points} fill="none" stroke="#cbd5e1" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      <polygon points={points} fill="none" stroke="#bcd6ad" strokeWidth={2} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
@@ -175,9 +178,18 @@ export function TileSlot({ size = 34 }: { size?: number }) {
   );
 }
 
-// A coin, drawn as a plain silver hexagon (a wildcard payment piece).
+// A coin (wildcard payment piece): a silver hexagon with a darker rim and a dark-grey glyph.
 export function CoinFace({ size = 34 }: { size?: number }) {
-  return <HexFace fill="#c7ccd4" size={size} title="coin (wildcard payment)" />;
+  return (
+    <span
+      className="coin-face"
+      title="coin (wildcard payment)"
+      style={{ width: size * HEX_RATIO, height: size, fontSize: size * 0.5 }}
+    >
+      <span className="tile-face coin-rim" />
+      <span className="tile-face coin-inner">{COIN_GLYPH}</span>
+    </span>
+  );
 }
 
 // An expansion piece, drawn as a miniature rosette — the same shape it takes on the board: six
@@ -215,8 +227,8 @@ export function ExpansionFace({ expansion, size = 18 }: { expansion: Expansion; 
           <g key={c.i}>
             <polygon
               points={hexPoints(c.cx, c.cy, r)}
-              fill={isId ? COLOUR_HEX[id.colour] : '#e2e8f0'}
-              stroke={isId ? 'rgba(0, 0, 0, 0.4)' : '#cbd5e1'}
+              fill={isId ? COLOUR_HEX[id.colour] : '#d3e4ca'}
+              stroke={isId ? 'rgba(0, 0, 0, 0.4)' : '#bcd6ad'}
               strokeWidth={1.5}
             />
             {isId && (
