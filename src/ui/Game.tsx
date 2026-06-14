@@ -69,8 +69,10 @@ import {
   jitterDegrees,
   pileRotation,
   SLOT_CENTRE,
-  SYMBOL_GLYPH,
   SYMBOL_LABEL,
+  SYMBOL_PATH,
+  SymbolGlyph,
+  SymbolIcon,
   symbolLabel,
   TILE_SIZE,
   TileFace,
@@ -746,7 +748,7 @@ function DraftablePiece({
               onMouseEnter={() => onPreview({ kind: 'symbol', symbol })}
               onMouseLeave={() => onPreview(null)}
             >
-              {SYMBOL_GLYPH[symbol]} {symbolLabel(symbol, symbolCount)} ({symbolCount})
+              <SymbolIcon symbol={symbol} /> {symbolLabel(symbol, symbolCount)} ({symbolCount})
             </button>
           </>
         )}
@@ -1459,14 +1461,14 @@ function GardenCell({
   let fill: string;
   let stroke: string;
   let strokeWidth = 1.5;
-  let glyph: string | null = cell.tile ? SYMBOL_GLYPH[cell.tile.symbol] : null;
+  let iconPath: string | null = cell.tile ? SYMBOL_PATH[cell.tile.symbol] : null;
   let className = 'gcell';
   if (preview) {
     // Show the actual tile/identity that will be placed here.
     fill = COLOUR_HEX[preview.colour];
     stroke = '#15803d';
     strokeWidth = 2.5;
-    glyph = SYMBOL_GLYPH[preview.symbol];
+    iconPath = SYMBOL_PATH[preview.symbol];
     className = 'gcell legal';
   } else if (isPreviewCell) {
     // Hovered cell of a blank-identity expansion: an empty-frame preview, no glyph.
@@ -1513,17 +1515,8 @@ function GardenCell({
         stroke={stroke}
         strokeWidth={strokeWidth}
       />
-      {glyph && (
-        <text
-          className="gglyph"
-          x={cell.cx}
-          y={cell.cy}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={r}
-        >
-          {glyph}
-        </text>
+      {iconPath && (
+        <SymbolGlyph className="gglyph" path={iconPath} cx={cell.cx} cy={cell.cy} R={r} />
       )}
     </g>
   );

@@ -357,8 +357,6 @@ button:disabled {
   gap: 0;
   padding: 0;
   background: #fff;
-  border: 1px solid #d3e4ca;
-  border-radius: 0;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   z-index: 20;
   overflow: hidden;
@@ -385,10 +383,11 @@ button:disabled {
 .draft-chip + .draft-chip {
   border-left: 1px solid #d3e4ca;
 }
-.draft-chip:not(:disabled):hover {
+/* Brightness only suits the coloured chip; on the white symbol/solo chip it would just wash a grey
+   wash back out to white (brightness(1.3) clamps #dde4d6 to white), so those get the grey instead. */
+.draft-chip.draft-chip-colour:not(:disabled):hover {
   filter: brightness(1.3);
 }
-/* brightness does nothing to the white symbol chip — give it a light grey wash instead. */
 .draft-chip:not(.draft-chip-colour):not(:disabled):hover {
   background: #dde4d6;
 }
@@ -402,7 +401,6 @@ button:disabled {
 .draft-chip:disabled {
   background: #eef5ea !important;
   color: #86997c;
-  border-color: #d3e4ca;
   filter: grayscale(1) opacity(0.5);
 }
 
@@ -523,6 +521,11 @@ button:disabled {
 .gglyph {
   pointer-events: none;
   user-select: none;
+}
+/* Inline symbol icon used in text flow (e.g. a draft chip): align it with the adjacent label. */
+.symbol-icon {
+  display: inline-block;
+  vertical-align: -0.15em;
 }
 
 /* The fly-in clone of a tile being placed: a fixed-position overlay that eases from the payment dock

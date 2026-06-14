@@ -34,15 +34,66 @@ export const COLOUR_LABEL_PLURAL: Record<Colour, string> = {
   yellow: 'Yellows',
 };
 
-// The 6 symbols → a glyph each.
-export const SYMBOL_GLYPH: Record<Symbol, string> = {
-  tree: '🌳',
-  bird: '🐦',
-  butterflies: '🦋',
-  flower: '🌸',
-  herb: '🌿',
-  tulip: '🌷',
+// The 6 symbols → a Phosphor icon each (fill weight, MIT-licensed — phosphoricons.com). Each value
+// is the `d` of a single path drawn in Phosphor's 256×256 viewBox; SymbolGlyph/SymbolIcon scale and
+// centre it. Solid silhouettes read better than line art at tile size.
+export const SYMBOL_VIEWBOX = 256;
+export const SYMBOL_PATH: Record<Symbol, string> = {
+  tree: 'M128,187.85a72.44,72.44,0,0,0,8,4.62V232a8,8,0,0,1-16,0V192.47A72.44,72.44,0,0,0,128,187.85ZM198.1,62.59a76,76,0,0,0-140.2,0A71.71,71.71,0,0,0,16,127.8C15.9,166,48,199,86.14,200A72.22,72.22,0,0,0,120,192.47V156.94L76.42,135.16a8,8,0,1,1,7.16-14.32L120,139.06V88a8,8,0,0,1,16,0v27.06l36.42-18.22a8,8,0,1,1,7.16,14.32L136,132.94v59.53A72.17,72.17,0,0,0,168,200l1.82,0C208,199,240.11,166,240,127.8A71.71,71.71,0,0,0,198.1,62.59Z',
+  bird: 'M236.44,73.34,213.21,57.86A60,60,0,0,0,156,16h-.29C122.79,16.16,96,43.47,96,76.89V96.63L11.63,197.88l-.1.12A16,16,0,0,0,24,224h88A104.11,104.11,0,0,0,216,120V100.28l20.44-13.62a8,8,0,0,0,0-13.32ZM126.15,133.12l-60,72a8,8,0,1,1-12.29-10.24l60-72a8,8,0,1,1,12.29,10.24ZM164,80a12,12,0,1,1,12-12A12,12,0,0,1,164,80Z',
+  butterflies: 'M128,100.17a108.42,108.42,0,0,0-8-12.64V56a8,8,0,0,1,16,0V87.53A108.42,108.42,0,0,0,128,100.17ZM232.7,50.48C229,45.7,221.84,40,209,40c-16.85,0-38.46,11.28-57.81,30.16A140.07,140.07,0,0,0,136,87.53V180a8,8,0,0,1-16,0V87.53a140.07,140.07,0,0,0-15.15-17.37C85.49,51.28,63.88,40,47,40,34.16,40,27,45.7,23.3,50.48c-6.82,8.77-12.18,24.08-.21,71.2,6.05,23.83,19.51,33,30.63,36.42A44,44,0,0,0,128,205.27a44,44,0,0,0,74.28-47.17c11.12-3.4,24.57-12.59,30.63-36.42C239.63,95.24,244.85,66.1,232.7,50.48Z',
+  flower: 'M210.35,129.36c-.81-.47-1.7-.92-2.62-1.36.92-.44,1.81-.89,2.62-1.36a40,40,0,1,0-40-69.28c-.81.47-1.65,1-2.48,1.59.08-1,.13-2,.13-3a40,40,0,0,0-80,0c0,.94,0,1.94.13,3-.83-.57-1.67-1.12-2.48-1.59a40,40,0,1,0-40,69.28c.81.47,1.7.92,2.62,1.36-.92.44-1.81.89-2.62,1.36a40,40,0,1,0,40,69.28c.81-.47,1.65-1,2.48-1.59-.08,1-.13,2-.13,2.95a40,40,0,0,0,80,0c0-.94-.05-1.94-.13-2.95.83.57,1.67,1.12,2.48,1.59A39.79,39.79,0,0,0,190.29,204a40.43,40.43,0,0,0,10.42-1.38,40,40,0,0,0,9.64-73.28ZM128,156a28,28,0,1,1,28-28A28,28,0,0,1,128,156Z',
+  herb: 'M223.45,40.07a8,8,0,0,0-7.52-7.52C139.8,28.08,78.82,51,52.82,94a87.09,87.09,0,0,0-12.76,49A101.72,101.72,0,0,0,46.7,175.2a4,4,0,0,0,6.61,1.43l85-86.3a8,8,0,0,1,11.32,11.32L56.74,195.94,42.55,210.13a8.2,8.2,0,0,0-.6,11.1,8,8,0,0,0,11.71.43l16.79-16.79c14.14,6.84,28.41,10.57,42.56,11.07q1.67.06,3.33.06A86.93,86.93,0,0,0,162,203.18C205,177.18,227.93,116.21,223.45,40.07Z',
+  tulip: 'M208,48a87.48,87.48,0,0,0-35.36,7.43c-15.1-25.37-39.92-38-41.06-38.59a8,8,0,0,0-7.16,0c-1.14.58-26,13.22-41.06,38.59A87.48,87.48,0,0,0,48,48a8,8,0,0,0-8,8V96a88.11,88.11,0,0,0,80,87.63v35.43L83.58,200.84a8,8,0,1,0-7.16,14.32l48,24a8,8,0,0,0,7.16,0l48-24a8,8,0,0,0-7.16-14.32L136,219.06V183.63A88.11,88.11,0,0,0,216,96V56A8,8,0,0,0,208,48ZM56,96V64.44A72.1,72.1,0,0,1,120,136v31.56A72.1,72.1,0,0,1,56,96Zm144,0a72.1,72.1,0,0,1-64,71.56V136a72.1,72.1,0,0,1,64-71.56Z',
 };
+
+// Render a symbol icon as a centred <path> inside an existing SVG, scaled to sit in a hex of
+// circumradius R at (cx, cy). White with a faint dark outline (painted behind the fill) so it stays
+// legible on every tile colour, from light yellow to dark blue.
+export function SymbolGlyph({
+  path,
+  cx = 0,
+  cy = 0,
+  R,
+  className,
+}: {
+  path: string;
+  cx?: number;
+  cy?: number;
+  R: number;
+  className?: string;
+}) {
+  const box = R * 1.3; // icon bounding-box side, a touch wider than the inscribed circle
+  const scale = box / SYMBOL_VIEWBOX;
+  return (
+    <path
+      className={className}
+      d={path}
+      transform={`translate(${(cx - box / 2).toFixed(2)} ${(cy - box / 2).toFixed(2)}) scale(${scale.toFixed(4)})`}
+      fill="#fff"
+      stroke="rgba(0, 0, 0, 0.4)"
+      strokeWidth={9}
+      strokeLinejoin="round"
+      paintOrder="stroke"
+    />
+  );
+}
+
+// A standalone symbol icon for HTML flow (e.g. a draft-chip label), inheriting the surrounding text
+// colour via currentColor.
+export function SymbolIcon({ symbol, size = 16 }: { symbol: Symbol; size?: number }) {
+  return (
+    <svg
+      className="symbol-icon"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${SYMBOL_VIEWBOX} ${SYMBOL_VIEWBOX}`}
+      aria-hidden="true"
+    >
+      <path d={SYMBOL_PATH[symbol]} fill="currentColor" />
+    </svg>
+  );
+}
 
 // The glyph shown on a coin (wildcard payment piece). Kept as a constant so it can be localised.
 export const COIN_GLYPH = '€';
@@ -234,6 +285,7 @@ export function jitterDegrees(key: string): number {
 export function HexFace({
   fill,
   glyph,
+  iconPath,
   size,
   stroke,
   strokeWidth = 1.5,
@@ -243,6 +295,7 @@ export function HexFace({
 }: {
   fill?: string;
   glyph?: string;
+  iconPath?: string; // a symbol icon (see SymbolGlyph); takes precedence over a text glyph
   size: number;
   stroke?: string;
   strokeWidth?: number;
@@ -263,10 +316,14 @@ export function HexFace({
       aria-hidden="true"
     >
       <polygon points={hexPoints(0, 0, R)} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
-      {glyph && (
-        <text x={0} y={0} textAnchor="middle" dominantBaseline="central" fontSize={fontSize ?? R}>
-          {glyph}
-        </text>
+      {iconPath ? (
+        <SymbolGlyph path={iconPath} R={R} />
+      ) : (
+        glyph && (
+          <text x={0} y={0} textAnchor="middle" dominantBaseline="central" fontSize={fontSize ?? R}>
+            {glyph}
+          </text>
+        )
       )}
     </svg>
   );
@@ -284,7 +341,7 @@ export function TileFace({
   return (
     <HexFace
       fill={COLOUR_HEX[tile.colour]}
-      glyph={SYMBOL_GLYPH[tile.symbol]}
+      iconPath={SYMBOL_PATH[tile.symbol]}
       size={size}
       // Match the stroke the garden gives a placed tile, so the two read as the same piece.
       stroke="rgba(0, 0, 0, 0.4)"
@@ -396,11 +453,7 @@ export function ExpansionFace({
               stroke={isId ? 'rgba(0, 0, 0, 0.4)' : emptyStroke}
               strokeWidth={1.5}
             />
-            {isId && (
-              <text x={c.cx} y={c.cy} textAnchor="middle" dominantBaseline="central" fontSize={r}>
-                {SYMBOL_GLYPH[id.symbol]}
-              </text>
-            )}
+            {isId && <SymbolGlyph path={SYMBOL_PATH[id.symbol]} cx={c.cx} cy={c.cy} R={r} />}
           </g>
         );
       })}
