@@ -505,7 +505,7 @@ export function ExpansionFace({
   return (
     <svg
       className={fill ? 'expansion-face expansion-face-fill' : 'expansion-face'}
-      data-jitter={jitter}
+      data-jitter={placeholder ? undefined : jitter}
       viewBox={`${minX.toFixed(2)} ${minY.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`}
       {...(fill ? { preserveAspectRatio: 'xMidYMid meet' } : { width: w.toFixed(2), height: h.toFixed(2) })}
       role="img"
