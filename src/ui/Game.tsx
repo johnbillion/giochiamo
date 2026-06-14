@@ -1351,7 +1351,10 @@ function PlayerPanel({
                     disabled={!active}
                     onClick={() => onTileItem(i)}
                   >
-                    {ghost ? <TileSlot size={TILE_SIZE} /> : <CoinFace size={TILE_SIZE} seed={`${jitterSalt}.${id}.${i}`} />}
+                    <span className="tile-stack">
+                      <TileSlot size={TILE_SIZE} />
+                      {!ghost && <CoinFace size={TILE_SIZE} seed={`${jitterSalt}.${id}.${i}`} />}
+                    </span>
                   </button>
                 );
               }
@@ -1362,11 +1365,10 @@ function PlayerPanel({
                   disabled={!active}
                   onClick={() => onTileItem(i)}
                 >
-                  {ghost ? (
+                  <span className="tile-stack">
                     <TileSlot size={TILE_SIZE} />
-                  ) : (
-                    <TileFace tile={item.tile} size={TILE_SIZE} seed={`${jitterSalt}.${id}.${i}`} />
-                  )}
+                    {!ghost && <TileFace tile={item.tile} size={TILE_SIZE} seed={`${jitterSalt}.${id}.${i}`} />}
+                  </span>
                 </button>
               );
             })}

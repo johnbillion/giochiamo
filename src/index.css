@@ -605,6 +605,13 @@ button:disabled {
   font-size: 2.8rem;
   line-height: 1;
 }
+.tile-stack {
+  display: inline-grid;
+}
+.tile-stack > * {
+  grid-area: 1 / 1;
+  place-self: center;
+}
 /* A coin is only useful as payment; outside a placement it's inert, so it gets no hover affordance. */
 .item.inert:not(:disabled) {
   cursor: default;
