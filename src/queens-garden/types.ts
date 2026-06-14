@@ -16,7 +16,7 @@ export type Phase = (typeof Phase)[keyof typeof Phase];
 export const COLOURS = ['blue', 'green', 'orange', 'pink', 'red', 'yellow'] as const;
 export type Colour = (typeof COLOURS)[number];
 
-export const SYMBOLS = ['tree', 'bird', 'butterflies', 'flower', 'herb', 'lily'] as const;
+export const SYMBOLS = ['tree', 'bird', 'butterflies', 'flower', 'herb', 'tulip'] as const;
 export type Symbol = (typeof SYMBOLS)[number];
 
 export const TILE_COPIES = 3; // 36 combos × 3 = 108 tiles

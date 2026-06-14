@@ -41,7 +41,7 @@ export const SYMBOL_GLYPH: Record<Symbol, string> = {
   butterflies: '🦋',
   flower: '🌸',
   herb: '🌿',
-  lily: '🌷',
+  tulip: '🌷',
 };
 
 // The glyph shown on a coin (wildcard payment piece). Kept as a constant so it can be localised.
@@ -54,18 +54,17 @@ export const SYMBOL_LABEL: Record<Symbol, string> = {
   butterflies: 'Butterflies',
   flower: 'Flower',
   herb: 'Herb',
-  lily: 'Lily',
+  tulip: 'Tulip',
 };
 
-// Plural display names, hardcoded so irregulars like "Lilies" read correctly. ("Butterflies" is
-// already plural-formed even in the singular, so it stays put.)
+// Plural display names, hardcoded so irregulars read correctly.
 export const SYMBOL_LABEL_PLURAL: Record<Symbol, string> = {
   tree: 'Trees',
   bird: 'Birds',
   butterflies: 'Butterflies',
   flower: 'Flowers',
   herb: 'Herbs',
-  lily: 'Lilies',
+  tulip: 'Tulips',
 };
 
 // Pick the singular or plural label for a colour/symbol based on how many are being referred to.

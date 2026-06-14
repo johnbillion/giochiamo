@@ -239,7 +239,7 @@ const placeTree = (slot: SlotId, dir: Direction): PlaceTileAction => ({
 
 // A ring expansion filled at dirs 1–5 with distinct-symbol reds (a legal arc), dir 0 left empty.
 const ringRedsMissingDir0 = (): (Tile | null)[] => {
-  const symbols: Symbol[] = ['bird', 'butterflies', 'flower', 'herb', 'lily'];
+  const symbols: Symbol[] = ['bird', 'butterflies', 'flower', 'herb', 'tulip'];
   const tiles: (Tile | null)[] = [null, null, null, null, null, null];
   [1, 2, 3, 4, 5].forEach((dir, i) => (tiles[dir] = tile('red', symbols[i]!)));
   return tiles;
@@ -247,7 +247,7 @@ const ringRedsMissingDir0 = (): (Tile | null)[] => {
 
 describe('earning coins (completion bonuses)', () => {
   it('earns 1 coin for completing the centre expansion', () => {
-    const symbols: Symbol[] = ['bird', 'butterflies', 'flower', 'herb', 'lily'];
+    const symbols: Symbol[] = ['bird', 'butterflies', 'flower', 'herb', 'tulip'];
     const garden = centreWith(
       ([1, 2, 3, 4, 5] as Direction[]).map((dir, i) => ({ dir, tile: tile('red', symbols[i]!) })),
     );

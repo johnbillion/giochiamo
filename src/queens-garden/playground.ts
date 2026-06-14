@@ -38,7 +38,7 @@ const attrStr = (a: Attribute): string => (a.kind === 'colour' ? a.colour : a.sy
 
 // --- garden ASCII rendering ---
 // Each of the 36 tiles (6 colours × 6 symbols) gets one character, 0-9 then A-Z. The index is
-// colour-major: blue/tree = 0 … yellow/lily = 35.
+// colour-major: blue/tree = 0 … yellow/tulip = 35.
 const TILE_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const tileChar = (t: Tile): string =>
   TILE_CHARS[COLOURS.indexOf(t.colour) * SYMBOLS.length + SYMBOLS.indexOf(t.symbol)] ?? '?';
