@@ -251,16 +251,20 @@ const EXPANSION_OUTLINE_POINTS = (() => {
 
 // A standalone SVG of the expansion-rosette outline, scaled to fill (and centre within) its box.
 // `rotate` spins the (origin-centred, 6-fold-symmetric) silhouette in place by a few degrees for a
-// hand-laid look. The viewBox is sized for the unrotated shape, so keep rotations modest.
-export function ExpansionOutline({ rotate = 0 }: { rotate?: number }) {
+// hand-laid look; `shiftY` nudges it up or down a touch. The viewBox is sized for the unrotated,
+// uncentred shape, so keep both modest.
+export function ExpansionOutline({ rotate = 0, shiftY = 0 }: { rotate?: number; shiftY?: number }) {
   const R = 10;
   const s = Math.sqrt(3);
   const pad = 2;
+  // Extra vertical room so a shiftY-nudged silhouette stays inside the viewBox instead of being clipped
+  // at the SVG edge. Covers pileShiftY's full ±6-unit range with a little slack for the stroke.
+  const padY = pad + 7;
   const points = EXPANSION_OUTLINE_POINTS.map(([x, y]) => `${(x * R).toFixed(2)},${(y * R).toFixed(2)}`).join(' ');
   const minX = -1.5 * s * R - pad;
-  const minY = -2.5 * R - pad;
+  const minY = -2.5 * R - padY;
   const w = 3 * s * R + 2 * pad;
-  const h = 5 * R + 2 * pad;
+  const h = 5 * R + 2 * padY;
   return (
     <svg
       className="expansion-outline"
@@ -274,7 +278,9 @@ export function ExpansionOutline({ rotate = 0 }: { rotate?: number }) {
         stroke="#d8c9ad"
         strokeWidth={2}
         vectorEffect="non-scaling-stroke"
-        transform={rotate ? `rotate(${rotate})` : undefined}
+        transform={
+          rotate || shiftY ? `translate(0 ${shiftY.toFixed(2)}) rotate(${rotate})` : undefined
+        }
       />
     </svg>
   );
@@ -297,8 +303,13 @@ const HEX_RATIO = Math.sqrt(3) / 2; // ≈ 0.866, width ÷ height of a regular p
 // The one hex dimension every piece is drawn at, so a tile is the same size wherever it appears and
 // a rosette hex matches a tile. TILE_SIZE is a tile's height; EXPANSION_HEX_R is the rosette-hex
 // circumradius (half the height), and the garden draws its cells at this radius too.
-export const TILE_SIZE = 56;
+export const TILE_SIZE = 84;
 export const EXPANSION_HEX_R = TILE_SIZE / 2;
+
+// The outline width every tile/expansion hex is drawn with — the single source of truth for stroke
+// weight. Every piece is drawn at the same scale (EXPANSION_HEX_R), so one value reads identically
+// across storage, the board, and the central piles.
+export const HEX_STROKE = 2.25;
 
 // Each tile/expansion gets a tiny, fixed "imperfect placement" tilt. The bucket is a deterministic
 // hash of a key, so it's stable across re-renders (a tile never jiggles in place) yet varies between
@@ -329,6 +340,12 @@ export function jitterBucket(key: string): number {
 export function pileRotation(key: string): number {
   return (hash32(key) % 5000) / 100;
 }
+// A stable vertical offset (in viewBox units) paired with pileRotation, so a pile's rosette also sits
+// a touch high or low rather than dead-centre. Centred on 0, ≈ ±6 units against the ~50-unit rosette
+// height — modest, like the rotation. Key it distinctly from the rotation so the two vary apart.
+export function pileShiftY(key: string): number {
+  return ((hash32(key) % 600) - 300) / 50;
+}
 // Degrees for a board cell, derived from the same buckets, centred on 0 (≈ ±1.2°). The packed
 // rosette can't use the HTML offsets (they'd gap the grid), so board cells only rotate, a little.
 export function jitterDegrees(key: string): number {
@@ -349,7 +366,7 @@ export function HexFace({
   iconPath,
   size,
   stroke,
-  strokeWidth = 1.5,
+  strokeWidth = HEX_STROKE,
   fontSize,
   className = 'tile-face',
   jitter,
@@ -466,18 +483,14 @@ const EMPTY_HEX_STROKE = '#7fb15f';
 const PLACEHOLDER_HEX_FILL = 'var(--empty-slot-fill)';
 const PLACEHOLDER_HEX_STROKE = 'var(--empty-slot-stroke)';
 
-// `fill` makes the SVG stretch to fill its container (matching ExpansionOutline) instead of
-// rendering at a fixed pixel size — used for a central pile, where the rosette should fill the frame.
 export function ExpansionFace({
   expansion,
-  size = 18,
-  fill = false,
+  size = EXPANSION_HEX_R,
   placeholder = false,
   seed = '',
 }: {
   expansion: Expansion;
   size?: number;
-  fill?: boolean;
   placeholder?: boolean;
   seed?: string | number;
 }) {
@@ -494,8 +507,7 @@ export function ExpansionFace({
     return { cx, cy, i };
   }).sort((a, b) => Number(a.i === identitySlot) - Number(b.i === identitySlot));
   const halfW = (r * Math.sqrt(3)) / 2;
-  // Match ExpansionOutline's relative padding (0.2·R) so the rosette overlays the frame exactly.
-  const pad = fill ? r * 0.2 : 1.5;
+  const pad = 1.5;
   const minX = Math.min(...cells.map((c) => c.cx)) - halfW - pad;
   const maxX = Math.max(...cells.map((c) => c.cx)) + halfW + pad;
   const minY = Math.min(...cells.map((c) => c.cy)) - r - pad;
@@ -504,10 +516,11 @@ export function ExpansionFace({
   const h = maxY - minY;
   return (
     <svg
-      className={fill ? 'expansion-face expansion-face-fill' : 'expansion-face'}
+      className="expansion-face"
       data-jitter={placeholder ? undefined : jitter}
       viewBox={`${minX.toFixed(2)} ${minY.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`}
-      {...(fill ? { preserveAspectRatio: 'xMidYMid meet' } : { width: w.toFixed(2), height: h.toFixed(2) })}
+      width={w.toFixed(2)}
+      height={h.toFixed(2)}
       role="img"
       aria-label={`${expansionLabel(expansion)} expansion`}
     >
@@ -519,7 +532,7 @@ export function ExpansionFace({
               points={hexPoints(c.cx, c.cy, r)}
               fill={isId ? COLOUR_HEX[id.colour] : emptyFill}
               stroke={isId ? 'rgba(0, 0, 0, 0.4)' : emptyStroke}
-              strokeWidth={1.5}
+              strokeWidth={HEX_STROKE}
             />
             {isId && <SymbolGlyph path={SYMBOL_PATH[id.symbol]} cx={c.cx} cy={c.cy} R={r} />}
           </g>

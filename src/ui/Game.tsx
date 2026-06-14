@@ -66,9 +66,11 @@ import {
   ExpansionFace,
   ExpansionOutline,
   HexFace,
+  HEX_STROKE,
   hexPoints,
   jitterDegrees,
   pileRotation,
+  pileShiftY,
   SLOT_CENTRE,
   SYMBOL_LABEL,
   SYMBOL_PATH,
@@ -600,7 +602,7 @@ function FlyingPiece({ flight, onDone }: { flight: FlyPiece; onDone: () => void 
       {flight.kind === 'tile' ? (
         <TileFace tile={flight.tile} size={to.height} />
       ) : (
-        <ExpansionFace expansion={flight.expansion} fill />
+        <ExpansionFace expansion={flight.expansion} size={EXPANSION_HEX_R} />
       )}
     </div>
   );
@@ -630,7 +632,7 @@ function DraftablePiece({
   symbol,
   face,
   dimmed,
-  fill = false,
+  pilePiece = false,
   draftable,
   onDraft,
   onPreview,
@@ -642,7 +644,7 @@ function DraftablePiece({
   symbol: Symbol;
   face: ReactNode; // the visual (a TileFace or ExpansionFace)
   dimmed: boolean;
-  fill?: boolean; // stretch the piece to fill its pile frame (a takeable expansion)
+  pilePiece?: boolean; // a takeable expansion revealed in a pile (plays the reveal animation)
   draftable: ReadonlySet<string>;
   onDraft: (attr: Attribute) => void;
   onPreview: (attr: Attribute | null) => void;
@@ -698,7 +700,7 @@ function DraftablePiece({
     <span
       data-reveal-order={revealOrder}
       data-draft-src={srcKey}
-      className={`draft-tile${fill ? ' pile-fill' : ''}${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}${
+      className={`draft-tile${pilePiece ? ' pile-piece' : ''}${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}${
         solo && soloEnabled ? ' clickable' : ''
       }`}
       onMouseEnter={() => {
@@ -710,13 +712,9 @@ function DraftablePiece({
     >
       {face}
       <span
-        className={`tile-popup${fill ? ' tile-popup-over' : ''}`}
+        className="tile-popup"
         ref={popupRef}
-        style={{
-          transform: fill
-            ? `translate(calc(-50% + ${shift}px), -50%)`
-            : `translateX(calc(-50% + ${shift}px))`,
-        }}
+        style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
       >
         {solo ? (
           <button
@@ -1052,12 +1050,12 @@ function CentralArea({
   // A takeable expansion is drafted the same way as a tile (by its identity's colour or symbol).
   // A spent pile (null expansion — its expansion already taken) renders empty, leaving only the
   // rosette outline so the pile keeps its slot.
-  // Rendered as a direct child of `.display` (not inside `.tiles`) so the rosette can fill the frame.
+  // Drawn at the standard hex scale and centred in `.display`, like the pile's tiles and the board.
   const renderExpansion = (expansion: Expansion | null, key: number, seed: string | number = key) => {
     if (expansion === null) return <span key={key} className="pile-spent" aria-label="empty pile" />;
-    const face = <ExpansionFace expansion={expansion} fill seed={seed} />;
+    const face = <ExpansionFace expansion={expansion} size={EXPANSION_HEX_R} seed={seed} />;
     const id = expansion.identity;
-    if (!canDraft || !id) return <span key={key} className="pile-fill">{face}</span>;
+    if (!canDraft || !id) return <span key={key} className="pile-piece">{face}</span>;
     return (
       <DraftablePiece
         key={key}
@@ -1065,7 +1063,7 @@ function CentralArea({
         symbol={id.symbol}
         face={face}
         dimmed={!matchesPreview(id)}
-        fill
+        pilePiece
         draftable={draftable}
         onDraft={beginDraft}
         onPreview={setPreview}
@@ -1083,34 +1081,13 @@ function CentralArea({
     sourceFor: (slot: number) => DraftSource,
   ) => (
     <>
-      <ExpansionOutline rotate={pileRotation(`${jitterSalt}:${state.round}:${rotationIndex}`)} />
+      <ExpansionOutline
+        rotate={pileRotation(`${jitterSalt}:${state.round}:${rotationIndex}`)}
+        shiftY={pileShiftY(`${jitterSalt}:${state.round}:${rotationIndex}:y`)}
+      />
       <div className="tiles">{tiles.map((t, j) => renderTile(t, j, sourceFor(j)))}</div>
     </>
   );
-
-  // TEMP debug: the pile's stable FLIP key + the colour/symbol of the expansion underneath each
-  // display. The FLIP key is what tracks the pile across a draft, so it's what we want to eyeball.
-  const debugDisplay = (index: number, expansion: Expansion | null) => {
-    const flipKey = displayFlipKey(expansion, index);
-    return (
-      <div
-        className="debug-pile"
-        style={{
-          position: 'absolute',
-          bottom: -18,
-          left: 0,
-          right: 0,
-          textAlign: 'center',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          color: 'magenta',
-          pointerEvents: 'none',
-        }}
-      >
-        {flipKey}
-      </div>
-    );
-  };
 
   return (
     <>
@@ -1145,7 +1122,6 @@ function CentralArea({
           {central.top.tiles.some(Boolean)
             ? renderTilePile(0, central.top.tiles, (slot) => ({ area: 'top', slot }))
             : renderExpansion(central.top.expansion, 0, 'top')}
-          {debugDisplay(0, central.top.expansion)}
         </div>
       )}
       {central.open.map((d, i) => {
@@ -1159,7 +1135,6 @@ function CentralArea({
             {hasTiles
               ? renderTilePile(i + 1, d.tiles, (slot) => ({ area: 'open', index: i, slot }))
               : renderExpansion(d.expansion, 0, `open${i}`)}
-            {debugDisplay(i + 1, d.expansion)}
           </div>
         );
       })}
@@ -1463,33 +1438,37 @@ function GardenCell({
   // unplaced expansion slot, or a filled tile — with the hover preview layered on top.
   let fill: string;
   let stroke: string;
-  let strokeWidth = 1.5;
+  // Base outline matches every other hex; highlighted cells (legal target, live preview) get a
+  // heavier stroke for affordance, with the about-to-fill rosette an intermediate weight.
+  const HILITE = (HEX_STROKE * 5) / 3;
+  const HOVER_ROSETTE = (HEX_STROKE * 4) / 3;
+  let strokeWidth = HEX_STROKE;
   let iconPath: string | null = cell.tile ? SYMBOL_PATH[cell.tile.symbol] : null;
   let className = 'gcell';
   if (preview) {
     // Show the actual tile/identity that will be placed here.
     fill = COLOUR_HEX[preview.colour];
     stroke = '#15803d';
-    strokeWidth = 2.5;
+    strokeWidth = HILITE;
     iconPath = SYMBOL_PATH[preview.symbol];
     className = 'gcell legal';
   } else if (isPreviewCell) {
     // Hovered cell of a blank-identity expansion: an empty-frame preview, no glyph.
     fill = '#bfe0a8';
     stroke = '#15803d';
-    strokeWidth = 2.5;
+    strokeWidth = HILITE;
     className = 'gcell legal';
   } else if (inHoveredRosette) {
     // The rest of the rosette the expansion is about to drop into — drawn in the same soft
     // green an empty slot of a placed expansion takes, so the hover previews the placed result.
     fill = '#bfe0a8';
     stroke = '#15803d';
-    strokeWidth = 2;
+    strokeWidth = HOVER_ROSETTE;
     className = cell.legal ? 'gcell legal' : 'gcell';
   } else if (cell.legal) {
     fill = '#86efac';
     stroke = '#15803d';
-    strokeWidth = 2.5;
+    strokeWidth = HILITE;
     className = 'gcell legal';
   } else if (!cell.hasExpansion) {
     fill = 'var(--empty-slot-fill)';

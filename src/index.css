@@ -26,7 +26,7 @@ button:disabled {
 }
 
 .game {
-  max-width: 1100px;
+  max-width: 1650px;
   margin: 0 auto;
   padding: 16px 16px 100px 16px;
 }
@@ -99,12 +99,13 @@ button:disabled {
 .expansion-face[data-jitter],
 .coin-face[data-jitter] {
   /* Each bucket sets a base --jr/--jx/--jy; `--jitter-scale` (inherited from the container) dials the
-     whole effect up or down per context — bigger in the central area, gentler in player storage. */
+     whole effect up or down per context — bigger in the central area, gentler in player storage.
+     `--jitter-y-scale`/`--jitter-r-scale` further dial only the vertical offset / rotation, per element. */
   transform: translate(
       calc(var(--jx, 0) * var(--jitter-scale, 1)),
-      calc(var(--jy, 0) * var(--jitter-scale, 1))
+      calc(var(--jy, 0) * var(--jitter-scale, 1) * var(--jitter-y-scale, 1))
     )
-    rotate(calc(var(--jr, 0deg) * var(--jitter-scale, 1)));
+    rotate(calc(var(--jr, 0deg) * var(--jitter-scale, 1) * var(--jitter-r-scale, 1)));
 }
 /* Every face is now an <svg>, which defaults to transform-box: view-box / transform-origin: 0 0 — so
    it would pivot around the viewBox corner and tilt all alike. Pin each to its own centre so it
@@ -176,10 +177,8 @@ button:disabled {
 /* --- central area --- */
 .central {
   position: relative; /* anchor for the floating draft prompt */
-  background: #fff;
-  border: 1px solid #d3e4ca;
-  padding: 12px 16px;
-  margin: 12px 0;
+  padding: 0;
+  margin: 0;
   --jitter-scale: 1.5; /* stronger hand-placed tilt for tiles/expansions in the central area */
 }
 .central h2,
@@ -188,7 +187,10 @@ button:disabled {
 }
 .displays {
   display: grid;
-  grid-template-columns: repeat(var(--displays, 5), minmax(0, 1fr));
+  /* Each pile is only as wide as one expansion card, and the row is centred — so a few piles bunch
+     together in the middle rather than stretching across the whole central area. */
+  grid-template-columns: repeat(var(--displays, 5), var(--display-w, 224px));
+  justify-content: center;
   gap: 12px;
   align-items: flex-start;
 }
@@ -198,7 +200,8 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 22px;
-  min-height: 150px;
+  /* Tall enough to hold the rosette plus its vertical jitter headroom without clipping. */
+  min-height: 264px;
 }
 /* When a new top of the pile is revealed, its rosette frame stays put and its tiles fade in one by
    one. `.display-reveal` is remounted via a key change each time a draft splits off the previous top,
@@ -245,20 +248,16 @@ button:disabled {
   gap: 4px;
   place-content: center;
   z-index: 1;
+  --jitter-r-scale: 2; /* tiles within a central pile get double the rotational jitter */
 }
-/* A takeable-expansion pile fills the frame, overlaying the rosette outline (also at inset:0). The
-   `.draft-tile` compound selector outranks the plain `.draft-tile` rule defined later in this file. */
-.pile-fill,
-.draft-tile.pile-fill {
-  position: absolute;
-  inset: 0;
-  display: block;
+/* A takeable expansion revealed in a pile: centred at the standard hex scale, like the pile's tiles.
+   It mounts exactly when a pile's last tile is drafted, so this fade/scale-in plays only then. */
+.pile-piece,
+.draft-tile.pile-piece {
+  position: relative;
   z-index: 1;
-}
-/* A pile-fill element mounts exactly when a pile's last tile is drafted and its expansion is
-   revealed (becomes takeable), so this fade/scale-in plays only then. */
-.pile-fill {
   animation: expansion-reveal 380ms ease-out;
+  --jitter-y-scale: 2; /* upturned expansion cards get double the vertical jitter */
 }
 @keyframes expansion-reveal {
   from {
@@ -270,17 +269,12 @@ button:disabled {
     transform: scale(1);
   }
 }
-.expansion-face-fill {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
 
 /* An emptied slot where a tile was drafted away — holds its place in the 2×2 grid. */
 .tile-blank {
   display: inline-flex;
-  width: 56px;
-  height: 56px;
+  width: 84px;
+  height: 84px;
 }
 
 /* A central-area tile with a hover popup offering to draft by its colour or symbol. */
@@ -357,10 +351,6 @@ button:disabled {
 }
 .draft-tile.open .tile-popup {
   display: flex;
-}
-/* For a takeable expansion the popup floats centred over the piece, not dropped below it. */
-.tile-popup-over {
-  top: 50%;
 }
 .draft-chip {
   border: none;
