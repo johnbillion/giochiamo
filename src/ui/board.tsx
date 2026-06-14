@@ -183,6 +183,12 @@ export function expansionLabel(expansion: Expansion): string {
 // the proportions correct (the CSS clip-path then fills it exactly). `size` is the height in px.
 const HEX_RATIO = Math.sqrt(3) / 2; // ≈ 0.866, width ÷ height of a regular pointy-top hexagon
 
+// The one hex dimension every piece is drawn at, so a tile is the same size wherever it appears and
+// a rosette hex matches a tile. TILE_SIZE is a tile's height; EXPANSION_HEX_R is the rosette-hex
+// circumradius (half the height), and the garden draws its cells at this radius too.
+export const TILE_SIZE = 56;
+export const EXPANSION_HEX_R = TILE_SIZE / 2;
+
 // Each tile/expansion gets a tiny, fixed "imperfect placement" tilt. The bucket is a deterministic
 // hash of a key, so it's stable across re-renders (a tile never jiggles in place) yet varies between
 // pieces. Pass a per-position `seed` so two identical tiles in the same pile/row don't tilt alike.
@@ -327,19 +333,30 @@ export function CoinFace({ size = 34, seed = '' }: { size?: number; seed?: strin
 // colour + symbol); the other five are empty. A starter expansion (no identity) has all six empty.
 const EXPANSION_IDENTITY_SLOT = 2; // which ring slot shows the identity tile (top-left)
 
+// A real expansion's empty hexes take the saturated placed-but-empty green; a `placeholder` rosette
+// (an empty storage slot) takes the muted --empty-slot-* green an unoccupied garden slot uses.
+const EMPTY_HEX_FILL = '#bfe0a8';
+const EMPTY_HEX_STROKE = '#7fb15f';
+const PLACEHOLDER_HEX_FILL = 'var(--empty-slot-fill)';
+const PLACEHOLDER_HEX_STROKE = 'var(--empty-slot-stroke)';
+
 // `fill` makes the SVG stretch to fill its container (matching ExpansionOutline) instead of
 // rendering at a fixed pixel size — used for a central pile, where the rosette should fill the frame.
 export function ExpansionFace({
   expansion,
   size = 18,
   fill = false,
+  placeholder = false,
   seed = '',
 }: {
   expansion: Expansion;
   size?: number;
   fill?: boolean;
+  placeholder?: boolean;
   seed?: string | number;
 }) {
+  const emptyFill = placeholder ? PLACEHOLDER_HEX_FILL : EMPTY_HEX_FILL;
+  const emptyStroke = placeholder ? PLACEHOLDER_HEX_STROKE : EMPTY_HEX_STROKE;
   const id = expansion.identity;
   const jitter = jitterBucket(`${id ? `${id.colour}:${id.symbol}` : 'starter'}:${seed}`);
   const r = size; // circumradius of each hex in the rosette
@@ -373,8 +390,8 @@ export function ExpansionFace({
           <g key={c.i}>
             <polygon
               points={hexPoints(c.cx, c.cy, r)}
-              fill={isId ? COLOUR_HEX[id.colour] : '#bfe0a8'}
-              stroke={isId ? 'rgba(0, 0, 0, 0.4)' : '#7fb15f'}
+              fill={isId ? COLOUR_HEX[id.colour] : emptyFill}
+              stroke={isId ? 'rgba(0, 0, 0, 0.4)' : emptyStroke}
               strokeWidth={1.5}
             />
             {isId && (

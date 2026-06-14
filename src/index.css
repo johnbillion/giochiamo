@@ -2,6 +2,9 @@
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   color: #1f3a26;
+
+  --empty-slot-fill: #eaf3e2;
+  --empty-slot-stroke: #cfe2c0;
 }
 
 * {
@@ -481,8 +484,6 @@ button:disabled {
 .garden {
   display: block;
   margin: 8px auto;
-  width: 100%;
-  height: auto;
 }
 .gcell.legal {
   cursor: pointer;

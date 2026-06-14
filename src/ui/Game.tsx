@@ -61,6 +61,7 @@ import {
   colourLabel,
   CoinFace,
   DIR_AXIAL,
+  EXPANSION_HEX_R,
   ExpansionFace,
   ExpansionOutline,
   hexPoints,
@@ -70,6 +71,7 @@ import {
   SYMBOL_GLYPH,
   SYMBOL_LABEL,
   symbolLabel,
+  TILE_SIZE,
   TileFace,
   TileSlot,
 } from './board';
@@ -691,6 +693,12 @@ function CentralArea({
   // ones); size the grid to that maximum so every pile sits at an equal fraction of the width.
   const maxPiles = expansionsPerRound(state.players.length as PlayerCount);
 
+  // Fan piles out from a central slot 0: odd slots go left (negative order), even slots go right, so
+  // the visual run for five reads 3, 1, 0, 2, 4. The grid always renders `maxPiles` slots — real
+  // piles first, empty fillers for the rest — so the centre stays fixed and piles grow outwards from
+  // the inside instead of repacking (which would shift the whole row) as the round opens more piles.
+  const displayOrder = (slot: number) => (slot % 2 === 1 ? -Math.ceil(slot / 2) : slot / 2);
+
   // Play the top's tile-reveal animation only when a NEW top is genuinely revealed — i.e. the
   // unrevealed-pile depth shrinks — not on the unrelated tile remounts that toggling the duplicate
   // selector causes. `revealing` gates the animation class (it starts true so the very first top
@@ -777,7 +785,7 @@ function CentralArea({
         { once: true },
       );
       requestAnimationFrame(() => {
-        node.style.transition = 'transform 5000ms cubic-bezier(0.2, 0.7, 0.2, 1)';
+        node.style.transition = 'transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1)';
         node.style.transform = '';
       });
     }
@@ -875,7 +883,7 @@ function CentralArea({
           onMouseEnter={candidate ? () => setHoverPick(source) : undefined}
           onMouseLeave={candidate ? () => setHoverPick(null) : undefined}
         >
-          <TileFace tile={t} size={56} seed={seed} />
+          <TileFace tile={t} size={TILE_SIZE} seed={seed} />
         </span>
       );
     }
@@ -884,7 +892,7 @@ function CentralArea({
         key={key}
         colour={t.colour}
         symbol={t.symbol}
-        face={<TileFace tile={t} size={56} seed={seed} />}
+        face={<TileFace tile={t} size={TILE_SIZE} seed={seed} />}
         dimmed={!matchesPreview(t)}
         draftable={draftable}
         onDraft={(attr) => beginDraft(attr, { tile: t, source })}
@@ -893,7 +901,7 @@ function CentralArea({
         revealOrder={source.area === 'top' ? revealOrder[source.slot ?? key] : undefined}
       />
     ) : (
-      <TileFace key={key} tile={t} size={56} seed={seed} />
+      <TileFace key={key} tile={t} size={TILE_SIZE} seed={seed} />
     );
   };
 
@@ -939,7 +947,6 @@ function CentralArea({
   // TEMP debug: the pile's stable FLIP key + the colour/symbol of the expansion underneath each
   // display. The FLIP key is what tracks the pile across a draft, so it's what we want to eyeball.
   const debugDisplay = (index: number, expansion: Expansion | null) => {
-    const ident = expansion?.identity;
     const flipKey = displayFlipKey(expansion, index);
     return (
       <div
@@ -989,9 +996,8 @@ function CentralArea({
           key={`top-${central.pile.length}`}
           data-flip-key={displayFlipKey(central.top.expansion, 0)}
         >
-          {/* Once the pile is exhausted the top dwindles in place: it keeps drawing tiles until
-              emptied, then shows its takeable expansion, then a spent placeholder — the same
-              lifecycle an open pile goes through, but without ever leaving the top slot. */}
+          {/* With the pile exhausted the top dwindles in place: tiles, then takeable expansion,
+              then spent placeholder — the open-pile lifecycle, without leaving the top slot. */}
           {central.top.tiles.some(Boolean)
             ? renderTilePile(0, central.top.tiles, (slot) => ({ area: 'top', slot }))
             : renderExpansion(central.top.expansion, 0, 'top')}
@@ -1000,11 +1006,12 @@ function CentralArea({
       )}
       {central.open.map((d, i) => {
         const hasTiles = d.tiles.some(Boolean);
+        // The top occupies slot 0 (dead centre); open piles take slots 1, 2, … and fan out from it.
         // A tile pile draws its rosette outline; a takeable expansion fills the frame with its own
         // rosette (so the outline behind would be redundant), and a spent pile (expansion already
         // taken) should read as empty.
         return (
-          <div className="display" key={i} data-flip-key={displayFlipKey(d.expansion, i + 1)}>
+          <div className="display" key={i} style={{ order: displayOrder(i + 1) }} data-flip-key={displayFlipKey(d.expansion, i + 1)}>
             {hasTiles
               ? renderTilePile(i + 1, d.tiles, (slot) => ({ area: 'open', index: i, slot }))
               : renderExpansion(d.expansion, 0, `open${i}`)}
@@ -1012,6 +1019,13 @@ function CentralArea({
           </div>
         );
       })}
+      {/* Pad the grid up to `maxPiles` with empty slots so the real piles keep their fixed columns:
+          slot 0 when the top is gone, then every slot beyond the last open pile. */}
+      {Array.from({ length: maxPiles }, (_, slot) => slot)
+        .filter((slot) => (slot === 0 ? !central.top : slot > central.open.length))
+        .map((slot) => (
+          <div className="display display-empty" key={`filler-${slot}`} style={{ order: displayOrder(slot) }} />
+        ))}
       </div>
     </>
   );
@@ -1054,9 +1068,9 @@ function PaymentDock({
     <div className="payment-dock">
       <span className="dock-chosen" aria-label="item being placed">
         {placedTile ? (
-          <TileFace tile={placedTile} size={56} />
+          <TileFace tile={placedTile} size={TILE_SIZE} />
         ) : (
-          placedExpansion && <ExpansionFace expansion={placedExpansion} size={16} />
+          placedExpansion && <ExpansionFace expansion={placedExpansion} size={EXPANSION_HEX_R} />
         )}
       </span>
       {need > 0 && (
@@ -1067,9 +1081,9 @@ function PaymentDock({
             return (
               <button key={`t${i}`} className="dock-slot filled" onClick={() => onUnselectTile(i)}>
                 {item.kind === 'coin' ? (
-                  <CoinFace size={48} seed={i} />
+                  <CoinFace size={TILE_SIZE} seed={i} />
                 ) : (
-                  <TileFace tile={item.tile} size={48} seed={i} />
+                  <TileFace tile={item.tile} size={TILE_SIZE} seed={i} />
                 )}
               </button>
             );
@@ -1083,13 +1097,13 @@ function PaymentDock({
                 className="dock-slot filled"
                 onClick={() => onUnselectExpansion(i)}
               >
-                <ExpansionFace expansion={expansion} size={14} />
+                <ExpansionFace expansion={expansion} size={EXPANSION_HEX_R} />
               </button>
             );
           })}
           {Array.from({ length: empties }).map((_, k) => (
             <span key={`empty-${k}`} className="dock-slot empty" aria-hidden="true">
-              <TileSlot size={48} />
+              <TileSlot size={TILE_SIZE} />
             </span>
           ))}
         </span>
@@ -1193,7 +1207,7 @@ function PlayerPanel({
                     disabled={!active}
                     onClick={() => onTileItem(i)}
                   >
-                    {ghost ? <TileSlot size={60} /> : <CoinFace size={60} seed={`${jitterSalt}.${id}.${i}`} />}
+                    {ghost ? <TileSlot size={TILE_SIZE} /> : <CoinFace size={TILE_SIZE} seed={`${jitterSalt}.${id}.${i}`} />}
                   </button>
                 );
               }
@@ -1205,16 +1219,16 @@ function PlayerPanel({
                   onClick={() => onTileItem(i)}
                 >
                   {ghost ? (
-                    <TileSlot size={60} />
+                    <TileSlot size={TILE_SIZE} />
                   ) : (
-                    <TileFace tile={item.tile} size={60} seed={`${jitterSalt}.${id}.${i}`} />
+                    <TileFace tile={item.tile} size={TILE_SIZE} seed={`${jitterSalt}.${id}.${i}`} />
                   )}
                 </button>
               );
             })}
             {Array.from({ length: STORAGE_TILE_LIMIT - player.storage.tileArea.length }).map((_, k) => (
               <span className="slot" key={`slot-${k}`} aria-hidden="true">
-                <TileSlot size={60} />
+                <TileSlot size={TILE_SIZE} />
               </span>
             ))}
           </div>
@@ -1231,7 +1245,7 @@ function PlayerPanel({
                 >
                   <ExpansionFace
                     expansion={ghost ? { identity: null } : s}
-                    size={18}
+                    size={EXPANSION_HEX_R}
                     seed={`${jitterSalt}.${id}.${i}`}
                   />
                 </button>
@@ -1240,7 +1254,7 @@ function PlayerPanel({
             {Array.from({ length: STORAGE_EXPANSION_LIMIT - player.storage.expansions.length }).map(
               (_, k) => (
                 <span className="slot" key={`slot-${k}`} aria-hidden="true">
-                  <ExpansionFace expansion={{ identity: null }} size={18} />
+                  <ExpansionFace expansion={{ identity: null }} size={EXPANSION_HEX_R} placeholder />
                 </span>
               ),
             )}
@@ -1322,8 +1336,8 @@ function GardenCell({
     strokeWidth = 2.5;
     className = 'gcell legal';
   } else if (!cell.hasExpansion) {
-    fill = '#eaf3e2';
-    stroke = '#cfe2c0';
+    fill = 'var(--empty-slot-fill)';
+    stroke = 'var(--empty-slot-stroke)';
   } else if (!cell.tile) {
     fill = '#bfe0a8';
     stroke = '#7fb15f';
@@ -1381,7 +1395,7 @@ function Garden({
   placedExpansion: Expansion | null;
   onCell: (slot: SlotId, dir: Direction, cellEl?: SVGGElement) => void;
 }) {
-  const R = 18; // hex circumradius in px
+  const R = EXPANSION_HEX_R; // hex circumradius in px — the shared standard size
   const placing = placedTile !== null || placedExpansion !== null;
 
   // The (slot, dir) cell the cursor is over, as a "slot:dir" key. Only legal cells set it, so a
@@ -1446,7 +1460,13 @@ function Garden({
   const renderCells = [...cells].sort((a, b) => renderPriority(a) - renderPriority(b));
 
   return (
-    <svg className="garden" viewBox={viewBox} aria-label="garden board">
+    <svg
+      className="garden"
+      viewBox={viewBox}
+      width={width.toFixed(2)}
+      height={height.toFixed(2)}
+      aria-label="garden board"
+    >
       {renderCells.map((c) => {
         const key = `${c.slot}:${c.dir}`;
         // Where the about-to-place item would land: the exact cell under the cursor, and — for an
