@@ -90,12 +90,6 @@ button:disabled {
   vertical-align: middle;
   cursor: default;
 }
-/* The symbol glyph is an SVG <text> node, which would otherwise show an I-beam cursor on hover. */
-.tile-face text,
-.coin-face text {
-  cursor: inherit;
-  user-select: none;
-}
 
 /* "Imperfect placement" jitter: each tile/expansion carries a data-jitter bucket (a stable hash of
    the piece + its position, set in board.tsx) that maps to a tiny fixed rotation and offset, so

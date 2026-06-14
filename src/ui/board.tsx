@@ -2,6 +2,7 @@
 // stays in the engine (`src/queens-garden`). This file just maps the engine's abstract
 // colours/symbols to pixels and lays the 7 hex expansions out on a grid.
 
+import { symbolCost } from '../queens-garden/placement';
 import type { Colour, Expansion, Symbol, Tile } from '../queens-garden/types';
 
 // The 6 colours → CSS fills. (The engine's colour names are arbitrary labels; these are ours.)
@@ -95,8 +96,17 @@ export function SymbolIcon({ symbol, size = 16 }: { symbol: Symbol; size?: numbe
   );
 }
 
-// The glyph shown on a coin (wildcard payment piece). Kept as a constant so it can be localised.
-export const COIN_GLYPH = '€';
+// The currency stamped on a coin (wildcard payment piece). Each value is the verbatim `d` of a
+// Phosphor regular-weight icon (currency-eur/-gbp/-dollar/-jpy) in the 256×256 viewBox; CoinFace
+// scales and centres it at render time, so these stay byte-for-byte copies of the source SVGs.
+export type Currency = 'eur' | 'gbp' | 'usd' | 'jpy';
+export const CURRENCY_PATH: Record<Currency, string> = {
+  eur: 'M190,192.33a8,8,0,0,1-.63,11.3A80,80,0,0,1,56.4,152H40a8,8,0,0,1,0-16H56V120H40a8,8,0,0,1,0-16H56.4A80,80,0,0,1,189.34,52.37,8,8,0,0,1,178.66,64.3,64,64,0,0,0,72.52,104H136a8,8,0,0,1,0,16H72v16h48a8,8,0,0,1,0,16H72.52a64,64,0,0,0,106.14,39.71A8,8,0,0,1,190,192.33Z',
+  gbp: 'M192,208a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h4a28,28,0,0,0,28-28V136H56a8,8,0,0,1,0-16H88V84a52,52,0,0,1,85.08-40.12A8,8,0,1,1,162.9,56.22,36,36,0,0,0,104,84v36h32a8,8,0,0,1,0,16H104v36a43.82,43.82,0,0,1-10.08,28H184A8,8,0,0,1,192,208Z',
+  usd: 'M152,120H136V56h8a32,32,0,0,1,32,32,8,8,0,0,0,16,0,48.05,48.05,0,0,0-48-48h-8V24a8,8,0,0,0-16,0V40h-8a48,48,0,0,0,0,96h8v64H104a32,32,0,0,1-32-32,8,8,0,0,0-16,0,48.05,48.05,0,0,0,48,48h16v16a8,8,0,0,0,16,0V216h16a48,48,0,0,0,0-96Zm-40,0a32,32,0,0,1,0-64h8v64Zm40,80H136V136h16a32,32,0,0,1,0,64Z',
+  jpy: 'M206.19,53.07,144.88,128H176a8,8,0,0,1,0,16H136v16h40a8,8,0,0,1,0,16H136v40a8,8,0,0,1-16,0V176H80a8,8,0,0,1,0-16h40V144H80a8,8,0,0,1,0-16h31.12L49.81,53.07A8,8,0,0,1,62.19,42.93L128,123.37l65.81-80.44a8,8,0,1,1,12.38,10.14Z',
+};
+export const COIN_CURRENCY: Currency = 'usd';
 
 // The 6 symbols → display names shown in the UI.
 export const SYMBOL_LABEL: Record<Symbol, string> = {
@@ -355,12 +365,13 @@ export function TileSlot({ size = 34 }: { size?: number }) {
   return <HexFace fill="#e7f1e0" size={size} stroke="none" className="tile-face tile-slot" />;
 }
 
-// A coin (wildcard payment piece): a round disc — a lighter face inside a darker rim — bearing the
-// coin glyph. Drawn as an SVG to sit alongside the tiles, though its shape is a circle, not a hex.
+// A coin (wildcard payment piece):
 export function CoinFace({ size = 34, seed = '' }: { size?: number; seed?: string | number }) {
   const d = size * 0.85; // coins read a touch smaller than the hex tiles beside them
   const r = d / 2;
   const pad = 0.5;
+  const symBox = r * 1.1;
+  const scale = symBox / 256;
   return (
     <svg
       className="coin-face"
@@ -370,19 +381,17 @@ export function CoinFace({ size = 34, seed = '' }: { size?: number; seed?: strin
       viewBox={`${(-r - pad).toFixed(2)} ${(-r - pad).toFixed(2)} ${(d + 2 * pad).toFixed(2)} ${(d + 2 * pad).toFixed(2)}`}
       aria-hidden="true"
     >
-      <circle cx={0} cy={0} r={r} fill="#c08a2e" />
-      <circle cx={0} cy={0} r={r * 0.82} fill="#f3c34e" />
-      <text
-        x={0}
-        y={0}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={d * 0.5}
-        fontWeight={700}
-        fill="#7c5310"
-      >
-        {COIN_GLYPH}
-      </text>
+      <circle cx={0} cy={0} r={r} fill="#c08a2e" /> {/* rim */}
+      <circle cx={0} cy={0} r={r * 0.82} fill="#f3c34e" /> {/* face */}
+      <path
+        d={CURRENCY_PATH[COIN_CURRENCY]}
+        transform={`translate(${(-symBox / 2).toFixed(2)} ${(-symBox / 2).toFixed(2)}) scale(${scale.toFixed(4)})`}
+        fill="#fff"
+        stroke="rgba(0, 0, 0, 0.4)"
+        strokeWidth={9}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      />
     </svg>
   );
 }
@@ -390,7 +399,14 @@ export function CoinFace({ size = 34, seed = '' }: { size?: number; seed?: strin
 // An expansion piece, drawn as a miniature rosette — the same shape it takes on the board: six
 // pointy-top hexes ringing a hollow centre. One slot holds the expansion's identity tile (its
 // colour + symbol); the other five are empty. A starter expansion (no identity) has all six empty.
-const EXPANSION_IDENTITY_SLOT = 2; // which ring slot shows the identity tile (top-left)
+//
+// The identity tile sits in the ring slot that names its placement cost: the six slots are numbered
+// 1–6 clockwise from the top-left, and an identity's cost (symbolCost: tree=1 … tulip=6) picks one.
+// COST_SLOT_DIR maps a cost (1-based) to its DIR_AXIAL index — 2(top-left), 3(top-right), 4(right),
+// 5(bottom-right), 0(bottom-left), 1(left). A starter (no identity) has nothing to place; it falls
+// back to the top-left slot, but every hex is empty so the choice is invisible.
+const COST_SLOT_DIR = [2, 3, 4, 5, 0, 1] as const;
+const STARTER_SLOT_DIR = 2;
 
 // A real expansion's empty hexes take the saturated placed-but-empty green; a `placeholder` rosette
 // (an empty storage slot) takes the muted --empty-slot-* green an unoccupied garden slot uses.
@@ -417,6 +433,7 @@ export function ExpansionFace({
   const emptyFill = placeholder ? PLACEHOLDER_HEX_FILL : EMPTY_HEX_FILL;
   const emptyStroke = placeholder ? PLACEHOLDER_HEX_STROKE : EMPTY_HEX_STROKE;
   const id = expansion.identity;
+  const identitySlot = id ? COST_SLOT_DIR[symbolCost(id.symbol) - 1] : STARTER_SLOT_DIR;
   const jitter = jitterBucket(`${id ? `${id.colour}:${id.symbol}` : 'starter'}:${seed}`);
   const r = size; // circumradius of each hex in the rosette
   // Draw the identity hex last so its darker border is never overdrawn by an adjacent hex's lighter
@@ -424,7 +441,7 @@ export function ExpansionFace({
   const cells = DIR_AXIAL.map(([q, rr], i) => {
     const [cx, cy] = axialToPixel(q, rr, r);
     return { cx, cy, i };
-  }).sort((a, b) => Number(a.i === EXPANSION_IDENTITY_SLOT) - Number(b.i === EXPANSION_IDENTITY_SLOT));
+  }).sort((a, b) => Number(a.i === identitySlot) - Number(b.i === identitySlot));
   const halfW = (r * Math.sqrt(3)) / 2;
   // Match ExpansionOutline's relative padding (0.2·R) so the rosette overlays the frame exactly.
   const pad = fill ? r * 0.2 : 1.5;
@@ -444,7 +461,7 @@ export function ExpansionFace({
       aria-label={`${expansionLabel(expansion)} expansion`}
     >
       {cells.map((c) => {
-        const isId = id !== null && c.i === EXPANSION_IDENTITY_SLOT;
+        const isId = id !== null && c.i === identitySlot;
         return (
           <g key={c.i}>
             <polygon
