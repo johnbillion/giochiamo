@@ -159,8 +159,8 @@ export function ExpansionOutline({ rotate = 0 }: { rotate?: number }) {
     >
       <polygon
         points={points}
-        fill="none"
-        stroke="#bcd6ad"
+        fill="#ede4d3"
+        stroke="#d8c9ad"
         strokeWidth={2}
         vectorEffect="non-scaling-stroke"
         transform={rotate ? `rotate(${rotate})` : undefined}
@@ -336,8 +336,8 @@ export function ExpansionFace({
           <g key={c.i}>
             <polygon
               points={hexPoints(c.cx, c.cy, r)}
-              fill={isId ? COLOUR_HEX[id.colour] : '#d3e4ca'}
-              stroke={isId ? 'rgba(0, 0, 0, 0.4)' : '#bcd6ad'}
+              fill={isId ? COLOUR_HEX[id.colour] : '#bfe0a8'}
+              stroke={isId ? 'rgba(0, 0, 0, 0.4)' : '#7fb15f'}
               strokeWidth={1.5}
             />
             {isId && (

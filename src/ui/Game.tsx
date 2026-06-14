@@ -587,6 +587,16 @@ const randomStagger = (): number[] => {
   return order;
 };
 
+// A stable identity for a pile display, used to track it across a draft for the FLIP slide
+// animation. A pile's underlying expansion is unique within the central area, so its identity
+// colour+symbol names the same pile even when it moves from the top slot into an open slot (and
+// React swaps the DOM node). Spent piles (expansion taken) never move, so an index key suffices.
+const displayFlipKey = (expansion: Expansion | null, index: number): string => {
+  if (!expansion) return `spent:${index}`;
+  const id = expansion.identity;
+  return id ? `exp:${id.colour}:${id.symbol}` : `top:${index}`;
+};
+
 // A combo (a distinct matching tile) whose physical copy the player must still choose, plus the
 // per-copy sources it can be taken from (one entry per matching tile, each carrying its slot).
 type PendingPick = { readonly combo: Tile; readonly sources: readonly DraftSource[] };
@@ -658,6 +668,57 @@ function CentralArea({
     const { combos, expansions } = draftPlan(state, attr);
     return combos.length + expansions.length;
   };
+
+  // FLIP slide: when a draft splits the top pile, its leftover tiles + expansion move from the top
+  // slot to an open slot (and React swaps the DOM node). We tag each `.display` with a stable
+  // flip-key, record every display's position relative to this grid before each commit, and after
+  // the commit translate any moved display back to its old spot, then transition it to its new one.
+  // Positions are measured relative to the grid container so an unrelated shift above (e.g. the
+  // duplicate-pick banner appearing) doesn't make every pile slide.
+  const displaysRef = useRef<HTMLDivElement>(null);
+  const flipRects = useRef<Map<string, { x: number; y: number }>>(new Map());
+  useLayoutEffect(() => {
+    const container = displaysRef.current;
+    if (!container) return;
+    const nodes = Array.from(container.querySelectorAll<HTMLElement>('[data-flip-key]'));
+    // Clear any in-flight transform so we measure true layout positions.
+    for (const node of nodes) {
+      node.style.transition = '';
+      node.style.transform = '';
+      node.style.zIndex = '';
+    }
+    const base = container.getBoundingClientRect();
+    const next = new Map<string, { x: number; y: number }>();
+    for (const node of nodes) {
+      const r = node.getBoundingClientRect();
+      next.set(node.dataset.flipKey!, { x: r.left - base.left, y: r.top - base.top });
+    }
+    for (const node of nodes) {
+      const key = node.dataset.flipKey!;
+      const prev = flipRects.current.get(key);
+      const now = next.get(key)!;
+      if (!prev) continue;
+      const dx = prev.x - now.x;
+      const dy = prev.y - now.y;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      // Lift the sliding pile above every other display so its tiles never pass behind a
+      // stationary pile; drop back to the natural stacking order once the slide finishes.
+      node.style.zIndex = '10';
+      node.style.transform = `translate(${dx}px, ${dy}px)`;
+      node.addEventListener(
+        'transitionend',
+        () => {
+          node.style.zIndex = '';
+        },
+        { once: true },
+      );
+      requestAnimationFrame(() => {
+        node.style.transition = 'transform 20000ms cubic-bezier(0.2, 0.7, 0.2, 1)';
+        node.style.transform = '';
+      });
+    }
+    flipRects.current = next;
+  }, [central]);
 
   // A draft in progress whose duplicate tiles the player is choosing copies for, or null when not
   // mid-selection. Any change to the game state (a completed action, a new turn) abandons it.
@@ -851,7 +912,7 @@ function CentralArea({
           </button>
         </div>
       )}
-      <div className="displays" style={{ '--displays': maxPiles } as CSSProperties}>
+      <div className="displays" ref={displaysRef} style={{ '--displays': maxPiles } as CSSProperties}>
       {central.top && (
         // Keyed on the unrevealed-pile depth, which drops by one every time a new top is revealed
         // (and only then). A fresh key remounts this display so the tile fade-in replays; the
@@ -860,6 +921,7 @@ function CentralArea({
         <div
           className={`display${revealing ? ' display-reveal' : ''}`}
           key={`top-${central.pile.length}`}
+          data-flip-key={displayFlipKey(central.top.expansion, 0)}
         >
           {renderTilePile(0, central.top.tiles, (slot) => ({ area: 'top', slot }))}
           {debugDisplay(0, central.top.expansion)}
@@ -871,7 +933,7 @@ function CentralArea({
         // rosette (so the outline behind would be redundant), and a spent pile (expansion already
         // taken) should read as empty.
         return (
-          <div className="display" key={i}>
+          <div className="display" key={i} data-flip-key={displayFlipKey(d.expansion, i + 1)}>
             {hasTiles
               ? renderTilePile(i + 1, d.tiles, (slot) => ({ area: 'open', index: i, slot }))
               : renderExpansion(d.expansion, 0, `open${i}`)}
