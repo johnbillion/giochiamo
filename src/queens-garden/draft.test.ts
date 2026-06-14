@@ -117,6 +117,36 @@ describe('draft — taking tiles', () => {
     expect(s1.central.top).toEqual(top); // spared
     expect(s1.central.open[0]!.tiles).toEqual([null]);
   });
+
+  it('removes the exact slot named, when two identical copies sit on one display', () => {
+    const central: CentralArea = {
+      top: {
+        expansion: { identity: tile('blue', 'tree') },
+        tiles: [tile('red', 'tree'), tile('pink', 'flower'), tile('red', 'tree'), tile('green', 'herb')],
+      },
+      open: [],
+      pile: [],
+    };
+    const s0 = makeState(central);
+
+    // Draft "tree": one red tree, taken specifically from slot 2 (not the matching copy in slot 0).
+    const draft: Action = {
+      type: ActionType.Draft,
+      attribute: { kind: 'symbol', symbol: 'tree' },
+      picks: [{ tile: tile('red', 'tree'), source: { area: 'top', slot: 2 } }],
+    };
+
+    expect(isLegal(s0, draft)).toBe(true);
+    const s1 = applyAction(s0, draft);
+    // Taking one tile drops the top below 4, so it splits off into an open display carrying its
+    // leftovers. Slot 2 is the hole; the copy in slot 0 survives in its original slot.
+    expect(s1.central.open[0]!.tiles).toEqual([
+      tile('red', 'tree'),
+      tile('pink', 'flower'),
+      null,
+      tile('green', 'herb'),
+    ]);
+  });
 });
 
 describe('draft — taking expansions', () => {

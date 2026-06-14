@@ -120,8 +120,12 @@ export type Attribute =
   | { readonly kind: 'colour'; readonly colour: Colour }
   | { readonly kind: 'symbol'; readonly symbol: Symbol };
 
-// Where a drafted tile is taken from: the top of the pile, or a split-off (open) display.
-export type DraftSource = { readonly area: 'top' } | { readonly area: 'open'; readonly index: number };
+// Where a drafted tile is taken from: the top of the pile, or a split-off (open) display. `slot` is
+// the tile's index within that display — supplied when the player picks a specific copy, so the
+// exact tile they clicked is the one removed. When omitted, the first matching tile is taken.
+export type DraftSource =
+  | { readonly area: 'top'; readonly slot?: number }
+  | { readonly area: 'open'; readonly index: number; readonly slot?: number };
 
 export type TilePick = { readonly tile: Tile; readonly source: DraftSource };
 

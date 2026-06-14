@@ -124,6 +124,7 @@ button:disabled {
 
 /* --- central area --- */
 .central {
+  position: relative; /* anchor for the floating draft prompt */
   background: #fff;
   border: 1px solid #d3e4ca;
   padding: 12px 16px;
@@ -146,6 +147,35 @@ button:disabled {
   place-items: center;
   padding: 22px;
   min-height: 150px;
+}
+/* When a new top of the pile is revealed, its rosette frame stays put and its tiles fade in one by
+   one. `.display-reveal` is remounted via a key change each time a draft splits off the previous top,
+   so the staggered tile animation replays only on a genuine reveal. The `backwards` fill keeps each
+   tile invisible through its delay, so they appear in sequence rather than all at once. */
+.display-reveal .tiles > * {
+  animation: tile-reveal 420ms ease-out backwards;
+}
+.display-reveal .tiles > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.display-reveal .tiles > *:nth-child(2) {
+  animation-delay: 200ms;
+}
+.display-reveal .tiles > *:nth-child(3) {
+  animation-delay: 400ms;
+}
+.display-reveal .tiles > *:nth-child(4) {
+  animation-delay: 600ms;
+}
+@keyframes tile-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .expansion-outline {
   position: absolute;
@@ -197,6 +227,49 @@ button:disabled {
 .draft-tile.clickable,
 .draft-tile.clickable .tile-face {
   cursor: pointer;
+}
+
+.draft-pick.candidate {
+  outline: 3px solid #2f7d4f;
+  outline-offset: 0;
+  animation: draft-pulse 1.1s ease-in-out infinite;
+}
+@keyframes draft-pulse {
+  0%,
+  100% {
+    outline-color: #2f7d4f;
+  }
+  50% {
+    outline-color: #8fd3a8;
+  }
+}
+
+.draft-banner {
+  position: absolute;
+  top: 90%;
+  left: 10px;
+  right: 10px;
+  margin-top: 8px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: #eef7f0;
+  border: 1px solid #2f7d4f;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.draft-cancel {
+  border: 1px solid #2f7d4f;
+  background: #fff;
+  padding: 5px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.draft-cancel:hover {
+  background: #2f7d4f;
+  color: #fff;
 }
 .tile-popup {
   position: absolute;

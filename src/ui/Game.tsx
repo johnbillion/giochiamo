@@ -24,7 +24,7 @@ import {
   isLegal,
   status,
 } from '../queens-garden/engine';
-import { buildDraft, draftableAttributes, draftPlan } from '../queens-garden/draft';
+import { draftableAttributes, draftPlan } from '../queens-garden/draft';
 import { symbolCost } from '../queens-garden/placement';
 import {
   ActionType,
@@ -37,6 +37,9 @@ import {
   type Colour,
   type Symbol,
   type Direction,
+  type DraftAction,
+  type DraftSource,
+  type TilePick,
   type Payment,
   type PlaceExpansionAction,
   type PlaceTileAction,
@@ -305,7 +308,7 @@ export function Game() {
     act(action);
   };
 
-  const draft = (attr: Attribute) => act(buildDraft(state, attr));
+  const draft = (action: DraftAction) => act(action);
 
   // --- render ---
 
@@ -527,6 +530,29 @@ function DraftablePiece({
   );
 }
 
+const sameTile = (a: Tile, b: Tile): boolean => a.colour === b.colour && a.symbol === b.symbol;
+
+// Display-level match, deliberately ignoring `slot`: used to highlight every copy of the active
+// combo and to confirm a clicked source belongs to the combo, regardless of which slot it sits in.
+const sameSource = (a: DraftSource, b: DraftSource): boolean =>
+  a.area === 'top' ? b.area === 'top' : b.area === 'open' && a.index === b.index;
+
+// Exact match including `slot`: identifies one physical tile, used to single out the hovered copy.
+const sameExactSource = (a: DraftSource, b: DraftSource): boolean =>
+  sameSource(a, b) && a.slot === b.slot;
+
+// A combo (a distinct matching tile) whose physical copy the player must still choose, plus the
+// per-copy sources it can be taken from (one entry per matching tile, each carrying its slot).
+type PendingPick = { readonly combo: Tile; readonly sources: readonly DraftSource[] };
+
+// An in-progress draft awaiting the player's source choices: the chosen attribute, the picks already
+// resolved (single-source combos, plus any the player has clicked), and the combos still to disambiguate.
+type DraftSelection = {
+  readonly attribute: Attribute;
+  readonly picks: readonly TilePick[];
+  readonly pending: readonly PendingPick[];
+};
+
 function CentralArea({
   state,
   draftable,
@@ -535,7 +561,7 @@ function CentralArea({
 }: {
   state: State;
   draftable: ReadonlySet<string>;
-  onDraft: (attr: Attribute) => void;
+  onDraft: (action: DraftAction) => void;
   canDraft: boolean;
 }) {
   const { central } = state;
@@ -560,13 +586,100 @@ function CentralArea({
     return combos.length + expansions.length;
   };
 
+  // A draft in progress whose duplicate tiles the player is choosing copies for, or null when not
+  // mid-selection. Any change to the game state (a completed action, a new turn) abandons it.
+  const [draftSel, setDraftSel] = useState<DraftSelection | null>(null);
+  useEffect(() => setDraftSel(null), [state]);
+
+  // The candidate copy currently under the cursor while choosing; hovering one fades the others so
+  // it's clear which copy a click would take.
+  const [hoverPick, setHoverPick] = useState<DraftSource | null>(null);
+
+  // Starting a draft. `from`, when present, is the exact tile+source whose popover the player used —
+  // so we can honour their click directly in the one case where it fully resolves the draft.
+  //
+  // A combo with a single matching tile resolves automatically; a combo with more than one (whether
+  // on the same display or spread across several) normally queues for the player to choose a copy.
+  // `sources` holds one entry per physical tile, so its length is that copy count.
+  //
+  // Exception: when the whole draft is a *single* combo of duplicates (e.g. "Tree" with nothing but
+  // two red trees), the click already names the copy the player wants — take it, no prompt. A draft
+  // spanning several combos (e.g. "Red" → red tree + red flower) still prompts for its duplicates,
+  // because the attribute chip doesn't pin down which copy of the duplicated combo was meant.
+  const beginDraft = (attribute: Attribute, from?: { tile: Tile; source: DraftSource }) => {
+    const combos = draftPlan(state, attribute).combos;
+    if (
+      combos.length === 1 &&
+      combos[0]!.sources.length > 1 &&
+      from &&
+      sameTile(from.tile, combos[0]!.combo) &&
+      combos[0]!.sources.some((s) => sameSource(s, from.source))
+    ) {
+      onDraft({ type: ActionType.Draft, attribute, picks: [{ tile: from.tile, source: from.source }] });
+      return;
+    }
+
+    const picks: TilePick[] = [];
+    const pending: PendingPick[] = [];
+    for (const { combo, sources } of combos) {
+      if (sources.length <= 1) picks.push({ tile: combo, source: sources[0]! });
+      else pending.push({ combo, sources });
+    }
+    if (pending.length === 0) {
+      onDraft({ type: ActionType.Draft, attribute, picks });
+      return;
+    }
+    setDraftSel({ attribute, picks, pending });
+  };
+
+  // Clicking a candidate tile during selection: lock in its source for the current pending combo,
+  // then advance to the next combo — or submit the finished draft once none remain.
+  const pickCopy = (source: DraftSource, tile: Tile) => {
+    if (!draftSel) return;
+    const [current, ...rest] = draftSel.pending;
+    if (!current || !sameTile(tile, current.combo)) return;
+    if (!current.sources.some((s) => sameSource(s, source))) return;
+    setHoverPick(null); // the next combo's copies start un-faded
+    const picks = [...draftSel.picks, { tile: current.combo, source }];
+    if (rest.length === 0) {
+      setDraftSel(null);
+      onDraft({ type: ActionType.Draft, attribute: draftSel.attribute, picks });
+      return;
+    }
+    setDraftSel({ ...draftSel, picks, pending: rest });
+  };
+
+  // During selection, the combo whose copy is currently being chosen. A tile is a clickable
+  // candidate when it matches that combo and sits on one of its allowed source displays.
+  const activePending = draftSel?.pending[0] ?? null;
+  const isCandidate = (t: Tile, source: DraftSource): boolean =>
+    activePending !== null &&
+    sameTile(t, activePending.combo) &&
+    activePending.sources.some((s) => sameSource(s, source));
+
   // A draft is only offered during play; otherwise pieces are plain (non-interactive) faces. A
   // null is a slot whose tile has been drafted away — rendered as an empty cell so the surviving
-  // tiles keep their positions in the 2×2 grid.
-  const renderTile = (t: Tile | null, key: number) =>
-    t === null ? (
-      <span key={key} className="tile-blank" aria-hidden="true" />
-    ) : canDraft ? (
+  // tiles keep their positions in the 2×2 grid. While a selection is in progress the popovers are
+  // suppressed; instead, matching copies of the active combo become directly clickable.
+  const renderTile = (t: Tile | null, key: number, source: DraftSource) => {
+    if (t === null) return <span key={key} className="tile-blank" aria-hidden="true" />;
+    if (draftSel) {
+      const candidate = isCandidate(t, source);
+      // Non-candidates are always dimmed; a candidate dims too when a *different* candidate is hovered.
+      const faded = !candidate || (hoverPick !== null && !sameExactSource(source, hoverPick));
+      return (
+        <span
+          key={key}
+          className={`draft-tile draft-pick${candidate ? ' candidate clickable' : ''}${faded ? ' dimmed' : ''}`}
+          onClick={candidate ? () => pickCopy(source, t) : undefined}
+          onMouseEnter={candidate ? () => setHoverPick(source) : undefined}
+          onMouseLeave={candidate ? () => setHoverPick(null) : undefined}
+        >
+          <TileFace tile={t} size={56} />
+        </span>
+      );
+    }
+    return canDraft ? (
       <DraftablePiece
         key={key}
         colour={t.colour}
@@ -574,13 +687,14 @@ function CentralArea({
         face={<TileFace tile={t} size={56} />}
         dimmed={!matchesPreview(t)}
         draftable={draftable}
-        onDraft={onDraft}
+        onDraft={(attr) => beginDraft(attr, { tile: t, source })}
         onPreview={setPreview}
         countFor={countFor}
       />
     ) : (
       <TileFace key={key} tile={t} size={56} />
     );
+  };
 
   // A takeable expansion is drafted the same way as a tile (by its identity's colour or symbol).
   // A spent pile (null expansion — its expansion already taken) renders empty, leaving only the
@@ -600,7 +714,7 @@ function CentralArea({
         dimmed={!matchesPreview(id)}
         fill
         draftable={draftable}
-        onDraft={onDraft}
+        onDraft={beginDraft}
         onPreview={setPreview}
         countFor={countFor}
       />
@@ -608,26 +722,48 @@ function CentralArea({
   };
 
   return (
-    <div className="displays" style={{ '--displays': maxPiles } as CSSProperties}>
-      <div className="display">
-        <ExpansionOutline />
-        <div className="tiles">
-          {central.top
-            ? central.top.tiles.map((t, i) => renderTile(t, i))
-            : <em>empty</em>}
+    <>
+      {draftSel && activePending && (
+        <div className="draft-banner">
+          <span>
+            Choose which{' '}
+            <strong>
+              {COLOUR_LABEL[activePending.combo.colour]} {SYMBOL_LABEL[activePending.combo.symbol]}
+            </strong>{' '}
+            to take
+            {draftSel.pending.length > 1 ? ` — ${draftSel.pending.length} choices left` : ''}
+          </span>
+          <button className="draft-cancel" onClick={() => setDraftSel(null)}>
+            Cancel
+          </button>
         </div>
-      </div>
+      )}
+      <div className="displays" style={{ '--displays': maxPiles } as CSSProperties}>
+      {central.top && (
+        // Keyed on the unrevealed-pile depth, which drops by one every time a new top is revealed
+        // (and only then). A fresh key remounts this display, replaying the fade-in — so the new
+        // pile top fades in after a draft splits the previous one off.
+        <div className="display display-reveal" key={`top-${central.pile.length}`}>
+          <ExpansionOutline />
+          <div className="tiles">
+            {central.top.tiles.map((t, i) => renderTile(t, i, { area: 'top', slot: i }))}
+          </div>
+        </div>
+      )}
       {central.open.map((d, i) => (
         <div className="display" key={i}>
           <ExpansionOutline />
           {d.tiles.some(Boolean) ? (
-            <div className="tiles">{d.tiles.map((t, j) => renderTile(t, j))}</div>
+            <div className="tiles">
+              {d.tiles.map((t, j) => renderTile(t, j, { area: 'open', index: i, slot: j }))}
+            </div>
           ) : (
             renderExpansion(d.expansion, 0)
           )}
         </div>
       ))}
-    </div>
+      </div>
+    </>
   );
 }
 

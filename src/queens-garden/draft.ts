@@ -40,14 +40,19 @@ function isEmptied(display: Display): boolean {
   return display.tiles.every((t) => t === null);
 }
 
-// Every draftable tile in the central area, tagged with the display it sits on. Holes are skipped.
+// Every draftable tile in the central area, tagged with the display and slot it sits in. Holes are
+// skipped, but the surviving tiles keep their original slot indices.
 function draftableTiles(central: CentralArea): { tile: Tile; source: DraftSource }[] {
   const out: { tile: Tile; source: DraftSource }[] = [];
   if (central.top) {
-    for (const tile of central.top.tiles) if (tile !== null) out.push({ tile, source: { area: 'top' } });
+    central.top.tiles.forEach((tile, slot) => {
+      if (tile !== null) out.push({ tile, source: { area: 'top', slot } });
+    });
   }
   central.open.forEach((display, index) => {
-    for (const tile of display.tiles) if (tile !== null) out.push({ tile, source: { area: 'open', index } });
+    display.tiles.forEach((tile, slot) => {
+      if (tile !== null) out.push({ tile, source: { area: 'open', index, slot } });
+    });
   });
   return out;
 }
@@ -81,12 +86,27 @@ function displayAt(central: CentralArea, source: DraftSource): Display | null {
 
 function sourceHasTile(central: CentralArea, source: DraftSource, combo: Tile): boolean {
   const display = displayAt(central, source);
-  return display !== null && display.tiles.some((t) => t !== null && sameTile(t, combo));
+  if (display === null) return false;
+  // A specific slot was named: that exact slot must hold the combo. Otherwise any matching tile will do.
+  if (source.slot !== undefined) {
+    const t = display.tiles[source.slot];
+    return t !== undefined && t !== null && sameTile(t, combo);
+  }
+  return display.tiles.some((t) => t !== null && sameTile(t, combo));
 }
 
-// Punch a hole where the combo sits, keeping the surviving tiles in their slots.
-function removeOne(tiles: (Tile | null)[], combo: Tile): void {
-  const i = tiles.findIndex((t) => t !== null && sameTile(t, combo));
+// Punch a hole where the pick sits, keeping the surviving tiles in their slots. A pick that names a
+// slot removes exactly that tile (the copy the player clicked); otherwise the first matching one.
+function removePick(tiles: (Tile | null)[], pick: TilePick): void {
+  const { slot } = pick.source;
+  if (slot !== undefined) {
+    const t = tiles[slot];
+    if (t !== undefined && t !== null && sameTile(t, pick.tile)) {
+      tiles[slot] = null;
+      return;
+    }
+  }
+  const i = tiles.findIndex((t) => t !== null && sameTile(t, pick.tile));
   if (i >= 0) tiles[i] = null;
 }
 
@@ -135,10 +155,10 @@ export function resolveDraft(state: State, action: DraftAction): State {
   const takenTiles: Tile[] = [];
   for (const pick of action.picks) {
     if (pick.source.area === 'top') {
-      if (topTiles) removeOne(topTiles, pick.tile);
+      if (topTiles) removePick(topTiles, pick);
     } else {
       const arr = openTiles[pick.source.index];
-      if (arr) removeOne(arr, pick.tile);
+      if (arr) removePick(arr, pick);
     }
     takenTiles.push(pick.tile);
   }
