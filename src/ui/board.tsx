@@ -224,26 +224,29 @@ export function jitterDegrees(key: string): number {
   return (jitterBucket(key) - (JITTER_BUCKETS - 1) / 2) * (span / (JITTER_BUCKETS - 1));
 }
 
-// The shared face primitive: a standalone SVG of a single coloured pointy-top hexagon with an
-// optional centred glyph. Unlike the old CSS clip-path span this replaced, an SVG <polygon> carries
-// a real stroke, so storage tiles can outline exactly like the ones placed in the garden (which is
-// itself one big SVG), and a flying clone can morph between the two without a tech seam. `size` is
-// the hex height in px; the box keeps the √3/2 width proportion and the viewBox hugs the hexagon
-// with a little padding so the stroke isn't clipped.
-function HexFace({
+// The shared face primitive: a standalone SVG of a single pointy-top hexagon with an optional centred
+// label. Unlike the old CSS clip-path span this replaced, an SVG <polygon> carries a real stroke, so
+// storage tiles can outline exactly like the ones placed in the garden (which is itself one big SVG),
+// and a flying clone can morph between the two without a tech seam. `size` is the hex height in px;
+// the box keeps the √3/2 width proportion and the viewBox hugs the hexagon with a little padding so
+// the stroke isn't clipped. `fill`/`stroke` are optional: omit them to drive the colours from CSS
+// (e.g. for buttons with hover/disabled states), or pass them inline as the coloured tiles do.
+export function HexFace({
   fill,
   glyph,
   size,
   stroke,
   strokeWidth = 1.5,
+  fontSize,
   className = 'tile-face',
   jitter,
 }: {
-  fill: string;
+  fill?: string;
   glyph?: string;
   size: number;
-  stroke: string;
+  stroke?: string;
   strokeWidth?: number;
+  fontSize?: number;
   className?: string;
   jitter?: number;
 }) {
@@ -261,7 +264,7 @@ function HexFace({
     >
       <polygon points={hexPoints(0, 0, R)} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
       {glyph && (
-        <text x={0} y={0} textAnchor="middle" dominantBaseline="central" fontSize={R}>
+        <text x={0} y={0} textAnchor="middle" dominantBaseline="central" fontSize={fontSize ?? R}>
           {glyph}
         </text>
       )}

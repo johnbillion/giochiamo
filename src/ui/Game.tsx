@@ -64,6 +64,7 @@ import {
   EXPANSION_HEX_R,
   ExpansionFace,
   ExpansionOutline,
+  HexFace,
   hexPoints,
   jitterDegrees,
   pileRotation,
@@ -284,6 +285,59 @@ export function Game() {
   const [placeAnim, setPlaceAnim] = useState<PlaceAnim | null>(null);
   const animKey = useRef(0);
 
+  // The drafted pieces currently flying from the central area into the (just-drafted) player's
+  // storage. Each removes itself when its transition ends. `draftFlight` carries the source rects
+  // captured at draft time over to the layout effect that measures the destinations after commit.
+  const [draftAnim, setDraftAnim] = useState<readonly FlyPiece[]>([]);
+  const draftFlight = useRef<{
+    player: number;
+    tiles: readonly { tile: Tile; from: DOMRect | null }[];
+    expansions: readonly { identity: Expansion['identity']; from: DOMRect | null }[];
+  } | null>(null);
+
+  // After a draft commits, the taken pieces have appended to the drafting player's storage (the last
+  // N tile items and M expansion items). Measure those landing slots now, pair each with the source
+  // rect captured at draft time, and launch the fly-in. Tiles pair by order (they append in pick
+  // order); expansions pair by identity (each is unique in the central area), sidestepping the
+  // open-first/top-last ordering quirk in resolveDraft.
+  useLayoutEffect(() => {
+    const flight = draftFlight.current;
+    draftFlight.current = null;
+    if (!flight) return;
+    const panel = document.querySelectorAll<HTMLElement>('.players .player')[flight.player];
+    if (!panel) return;
+    const flights: FlyPiece[] = [];
+
+    // A landing slot's true resting rect. A freshly added `.item` is mid `storage-fade-in` (scaling
+    // 0.8→1) right now, so measuring it raw would capture a shrunken box; cancel that animation first
+    // — which also stops the item visibly scaling up *under* the clone, since the fly-in replaces it.
+    // Measure the inner face, not the padded button, so both endpoints frame the same hexagon.
+    const landingRect = (el: HTMLElement, faceSel: string): DOMRect => {
+      el.style.animation = 'none';
+      return (el.querySelector<HTMLElement>(faceSel) ?? el).getBoundingClientRect();
+    };
+
+    const tileItems = Array.from(panel.querySelectorAll<HTMLElement>('.tile-items .item'));
+    const tileBase = tileItems.length - flight.tiles.length;
+    flight.tiles.forEach((cap, k) => {
+      const el = tileItems[tileBase + k];
+      if (!cap.from || !el) return;
+      flights.push({ kind: 'tile', tile: cap.tile, from: cap.from, to: landingRect(el, '.tile-face'), key: animKey.current++ });
+    });
+
+    const expItems = Array.from(panel.querySelectorAll<HTMLElement>('.expansion-items .item'));
+    const storageExp = state.players[flight.player]?.storage.expansions ?? [];
+    const expBase = storageExp.length - flight.expansions.length;
+    expItems.slice(expBase).forEach((el, k) => {
+      const ident = storageExp[expBase + k]?.identity ?? null;
+      const cap = flight.expansions.find((e) => identityKey(e.identity) === identityKey(ident));
+      if (!cap?.from) return;
+      flights.push({ kind: 'expansion', expansion: { identity: cap.identity }, from: cap.from, to: landingRect(el, '.expansion-face'), key: animKey.current++ });
+    });
+
+    if (flights.length > 0) setDraftAnim((a) => [...a, ...flights]);
+  }, [state]);
+
   // --- click handlers (storage → selection / payment, garden → place) ---
 
   const toggle = (set: ReadonlySet<number>, i: number): Set<number> => {
@@ -349,7 +403,26 @@ export function Game() {
     act(action);
   };
 
-  const draft = (action: DraftAction) => act(action);
+  // Capture where each taken piece sits in the central area right now — before the commit clears it
+  // — so the post-commit layout effect can fly a clone from there into its storage slot. Tiles are
+  // found by their `data-draft-src` key; expansions by the stable flip-key on their pile display. We
+  // measure the inner face (the hexagon/rosette itself, not its padded frame) so the source endpoint
+  // matches the face-based destination rect — otherwise an expansion would launch from its whole pile
+  // frame rather than the rosette within it.
+  const faceRect = (selector: string): DOMRect | null =>
+    document.querySelector(selector)?.getBoundingClientRect() ?? null;
+  const draft = (action: DraftAction) => {
+    const tiles = action.picks.map((p) => ({
+      tile: p.tile,
+      from: faceRect(`.displays [data-draft-src="${draftSrcKey(p.source)}"] .tile-face`),
+    }));
+    const expansions = draftPlan(state, action.attribute).expansions.map((e) => ({
+      identity: e.identity,
+      from: faceRect(`.displays [data-flip-key="${displayFlipKey(e, 0)}"] .expansion-face`),
+    }));
+    draftFlight.current = { player: state.currentPlayer, tiles, expansions };
+    act(action);
+  };
 
   // --- render ---
 
@@ -442,6 +515,14 @@ export function Game() {
           onDone={() => setPlaceAnim((a) => (a?.key === placeAnim.key ? null : a))}
         />
       )}
+
+      {draftAnim.map((flight) => (
+        <FlyingPiece
+          key={flight.key}
+          flight={flight}
+          onDone={() => setDraftAnim((a) => a.filter((f) => f.key !== flight.key))}
+        />
+      ))}
     </div>
   );
 }
@@ -483,6 +564,45 @@ function FlyingTile({ anim, onDone }: { anim: PlaceAnim; onDone: () => void }) {
   );
 }
 
+// A drafted piece sailing from the central area into its storage slot. Like FlyingTile, it's a
+// fixed-position clone anchored at the destination (the real storage slot is already filled
+// underneath) and released from a transform that puts it back at its central-area spot, so it eases
+// across and removes itself once the transition ends. Tiles and expansions are the same size in both
+// places, but the scale is still derived from the rects so a takeable expansion (which fills its
+// larger pile frame) shrinks smoothly into its storage slot.
+function FlyingPiece({ flight, onDone }: { flight: FlyPiece; onDone: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { from, to } = flight;
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    const scale = to.height ? from.height / to.height : 1;
+    el.style.transition = 'none';
+    el.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+    const id = requestAnimationFrame(() => {
+      el.style.transition = 'transform 1000ms cubic-bezier(0.2, 0.7, 0.2, 1)';
+      el.style.transform = 'translate(0px, 0px) scale(1)';
+    });
+    return () => cancelAnimationFrame(id);
+  }, [from, to]);
+  return (
+    <div
+      ref={ref}
+      className="flying-tile"
+      style={{ left: to.left, top: to.top, width: to.width, height: to.height }}
+      onTransitionEnd={onDone}
+    >
+      {flight.kind === 'tile' ? (
+        <TileFace tile={flight.tile} size={to.height} />
+      ) : (
+        <ExpansionFace expansion={flight.expansion} fill />
+      )}
+    </div>
+  );
+}
+
 function GameOver({ players }: { players: readonly PlayerState[] }) {
   const best = Math.max(...players.map((p) => p.score));
   return (
@@ -513,6 +633,7 @@ function DraftablePiece({
   onPreview,
   countFor,
   revealOrder,
+  srcKey,
 }: {
   colour: Colour;
   symbol: Symbol;
@@ -526,6 +647,8 @@ function DraftablePiece({
   countFor: (attr: Attribute) => number;
   // Position (1–4) in the randomized tile-reveal stagger; drives animation-delay via CSS. Top only.
   revealOrder?: number | undefined;
+  // The (area, slot) key a completed draft uses to find this tile and fly a clone into storage.
+  srcKey?: string | undefined;
 }) {
   const colourCount = countFor({ kind: 'colour', colour });
   const symbolCount = countFor({ kind: 'symbol', symbol });
@@ -571,6 +694,7 @@ function DraftablePiece({
   return (
     <span
       data-reveal-order={revealOrder}
+      data-draft-src={srcKey}
       className={`draft-tile${fill ? ' pile-fill' : ''}${dimmed ? ' dimmed' : ''}${open ? ' open' : ''}${
         solo && soloEnabled ? ' clickable' : ''
       }`}
@@ -662,6 +786,21 @@ const displayFlipKey = (expansion: Expansion | null, index: number): string => {
   const id = expansion.identity;
   return id ? `exp:${id.colour}:${id.symbol}` : `top:${index}`;
 };
+
+// The DOM key stamped on each central tile (`data-draft-src`) so a completed draft can find the
+// exact tile that was taken and fly a clone of it into the storage slot it lands in. Mirrors the
+// (area, index, slot) identity of the DraftSource the pick carries.
+const draftSrcKey = (s: DraftSource): string =>
+  s.area === 'top' ? `top:${s.slot}` : `open:${s.index}:${s.slot}`;
+
+const identityKey = (id: Expansion['identity']): string =>
+  id ? `${id.colour}:${id.symbol}` : '';
+
+// One drafted piece in flight: a fixed-position clone easing from its central-area spot (`from`) to
+// its storage slot (`to`), both in viewport coordinates. `key` distinguishes concurrent flights.
+type FlyPiece =
+  | { readonly kind: 'tile'; readonly tile: Tile; readonly from: DOMRect; readonly to: DOMRect; readonly key: number }
+  | { readonly kind: 'expansion'; readonly expansion: Expansion; readonly from: DOMRect; readonly to: DOMRect; readonly key: number };
 
 // A combo (a distinct matching tile) whose physical copy the player must still choose, plus the
 // per-copy sources it can be taken from (one entry per matching tile, each carrying its slot).
@@ -878,6 +1017,7 @@ function CentralArea({
       return (
         <span
           key={key}
+          data-draft-src={draftSrcKey(source)}
           className={`draft-tile draft-pick${candidate ? ' candidate clickable' : ''}${faded ? ' dimmed' : ''}`}
           onClick={candidate ? () => pickCopy(source, t) : undefined}
           onMouseEnter={candidate ? () => setHoverPick(source) : undefined}
@@ -899,6 +1039,7 @@ function CentralArea({
         onPreview={setPreview}
         countFor={countFor}
         revealOrder={source.area === 'top' ? revealOrder[source.slot ?? key] : undefined}
+        srcKey={draftSrcKey(source)}
       />
     ) : (
       <TileFace key={key} tile={t} size={TILE_SIZE} seed={seed} />
@@ -1264,11 +1405,21 @@ function PlayerPanel({
 
       {active && (
         <button className="pass" onClick={onPass}>
-          Pass
+          <PassHex />
         </button>
       )}
     </div>
   );
+}
+
+// The Pass action drawn as a pointy-top hexagon, matching the garden/storage tiles, so the button
+// reads as a piece of the board rather than a generic chrome button. White fill, blue-ish border and
+// label set it apart from the coloured tiles; the surrounding <button> is bare (see `.pass` CSS) so
+// this SVG is the whole visible control.
+function PassHex() {
+  // Reuse the shared tile hexagon. Fill/stroke/label colours are left to the `.pass-hex` CSS so the
+  // button can recolour on hover and when disabled.
+  return <HexFace size={TILE_SIZE} glyph="Pass" fontSize={13} strokeWidth={2} className="pass-hex" />;
 }
 
 // A single garden cell: the hexagon plus its optional symbol glyph, and the placement click/hover
