@@ -56,6 +56,7 @@ import {
 import { submit, type GameDispatch } from '../transport/submit';
 import {
   axialToPixel,
+  cheeseSlicesFor,
   COLOUR_HEX,
   COLOUR_LABEL,
   colourLabel,
@@ -1582,6 +1583,23 @@ function Garden({
     });
   });
 
+  // Cheese slices: each placed tile sends a triangular wedge into every adjacent hole (the rosette
+  // centres and junction gaps between playable cells). Computed from the tile's axial position and
+  // filled with the tile's own colour, so a wedge reads as that tile reaching into the empty gap.
+  type Slice = { points: string; fill: string; key: string };
+  const slices: Slice[] = [];
+  SLOT_CENTRE.forEach((centre, slot) => {
+    const expansion = player.garden[slot];
+    if (!expansion) return;
+    DIR_AXIAL.forEach(([dq, dr], dir) => {
+      const tile = expansion.tiles[dir] ?? null;
+      if (!tile) return;
+      cheeseSlicesFor(centre[0] + dq, centre[1] + dr, R).forEach((points, i) => {
+        slices.push({ points, fill: COLOUR_HEX[tile.colour], key: `${slot}:${dir}:${i}` });
+      });
+    });
+  });
+
   const padX = (R * Math.sqrt(3)) / 2 + 2;
   const padY = R + 2;
   const width = maxX - minX + 2 * padX;
@@ -1611,6 +1629,15 @@ function Garden({
       height={height.toFixed(2)}
       aria-label="garden board"
     >
+      {slices.length > 0 && (
+        // One translucent layer, drawn opaque within and composited as a whole, so abutting slices
+        // of the same colour merge into a single shape with no seam between them.
+        <g className="cheese-layer">
+          {slices.map((s) => (
+            <polygon key={s.key} className="cheese-slice" points={s.points} fill={s.fill} />
+          ))}
+        </g>
+      )}
       {renderCells.map((c) => {
         const key = `${c.slot}:${c.dir}`;
         // Where the about-to-place item would land: the exact cell under the cursor, and — for an

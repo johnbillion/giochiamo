@@ -516,6 +516,16 @@ button:disabled {
   pointer-events: none;
   user-select: none;
 }
+/* Cheese slices: wedges a placed tile sends into adjacent empty holes, in the tile's colour. The
+   whole layer is softened as one (group opacity) and the slices carry no stroke, so two same-colour
+   slices meeting in a hole read as a single shape — no seam, no border between them. */
+.cheese-layer {
+  pointer-events: none;
+  opacity: 0.55;
+}
+.cheese-slice {
+  stroke: none;
+}
 /* Inline symbol icon used in text flow (e.g. a draft chip): align it with the adjacent label. */
 .symbol-icon {
   display: inline-block;

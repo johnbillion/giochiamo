@@ -171,8 +171,66 @@ export function hexPoints(cx: number, cy: number, R: number): string {
     .join(' ');
 }
 
+// --- cheese slices ---
+// The garden's playable cells are the 42 tile slots; the gaps between them are the 13 "holes" — the
+// 7 rosette centres and the 6 junction gaps (see queens-garden-board-layout.md). When a tile is
+// placed beside a hole, it sends a "cheese slice" — a triangular wedge — out into that hole, apex at
+// the hole's centre and base on the edge it shares with the tile (one sextant of the hexagonal hole,
+// like a slice cut from a wheel). A tile can border 1–3 holes, so it grows 1–3 slices.
+
+// Axial keys ("q,r") of every tile slot: each expansion centre offset by each of the six DIR_AXIAL.
+const TILE_SLOT_KEYS: ReadonlySet<string> = (() => {
+  const keys = new Set<string>();
+  for (const [cq, cr] of SLOT_CENTRE)
+    for (const [dq, dr] of DIR_AXIAL) keys.add(`${cq + dq},${cr + dr}`);
+  return keys;
+})();
+
+// The interior holes: a non-slot position is a hole exactly when all six of its neighbours are tile
+// slots (which rings every rosette centre and every junction gap, but never the open space outside
+// the flower). Derived once from the board geometry rather than hardcoded.
+export const GARDEN_HOLE_KEYS: ReadonlySet<string> = (() => {
+  const holes = new Set<string>();
+  for (const key of TILE_SLOT_KEYS) {
+    const [q, r] = key.split(',').map(Number) as [number, number];
+    for (const [dq, dr] of DIR_AXIAL) {
+      const nq = q + dq;
+      const nr = r + dr;
+      const nk = `${nq},${nr}`;
+      if (TILE_SLOT_KEYS.has(nk) || holes.has(nk)) continue;
+      if (DIR_AXIAL.every(([eq, er]) => TILE_SLOT_KEYS.has(`${nq + eq},${nr + er}`))) holes.add(nk);
+    }
   }
-  return corners.join(' ');
+  return holes;
+})();
+
+// The cheese slices a tile at axial (q, r) sends into its neighbouring holes, each as an SVG points
+// string. For every hole-bearing neighbour direction: take the hole hexagon's two corners nearest
+// the tile (the shared edge) and its centre — exactly one sextant of the hexagonal hole. At full
+// size (inset 1) the slices butt up against the tile edge and each other, so the wedges from tiles
+// ringing a hole meet without gaps and tile it like slices of a wheel.
+const SLICE_INSET = 1;
+export function cheeseSlicesFor(q: number, r: number, R: number): string[] {
+  const [cx, cy] = axialToPixel(q, r, R);
+  const slices: string[] = [];
+  for (const [dq, dr] of DIR_AXIAL) {
+    const nq = q + dq;
+    const nr = r + dr;
+    if (!GARDEN_HOLE_KEYS.has(`${nq},${nr}`)) continue;
+    const [hx, hy] = axialToPixel(nq, nr, R);
+    const [a, b] = hexCorners(hx, hy, R)
+      .sort((p1, p2) => (p1[0] - cx) ** 2 + (p1[1] - cy) ** 2 - ((p2[0] - cx) ** 2 + (p2[1] - cy) ** 2))
+      .slice(0, 2);
+    const tri: [number, number][] = [[hx, hy], a as [number, number], b as [number, number]];
+    const gx = tri.reduce((s, p) => s + p[0], 0) / 3;
+    const gy = tri.reduce((s, p) => s + p[1], 0) / 3;
+    slices.push(
+      tri
+        .map(([x, y]) => `${(gx + (x - gx) * SLICE_INSET).toFixed(2)},${(gy + (y - gy) * SLICE_INSET).toFixed(2)}`)
+        .join(' '),
+    );
+  }
+  return slices;
 }
 
 // The outer silhouette of an expansion rosette — the union of the six hexes with no internal
